@@ -1,0 +1,22 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config files with sensitive data
+config/db.php
+
+# Uploads and temp files
+uploads/
+tmp/
+*.log
+
+# Migration files (keep SQL files but ignore after running)
+# migration_*.sql
+
