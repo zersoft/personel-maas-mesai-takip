@@ -91,21 +91,21 @@ if (isset($_GET['error'])) {
                     <label class="form-label">Yıl</label>
                     <input type="number" class="form-control" name="yil" value="<?php echo $bordro['yil']; ?>" required>
                 </div>
-                <div class="col-md-6 mb-3">
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
                     <label class="form-label">Brüt Maaş (₺)</label>
                     <div class="input-group">
                         <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="brut_maas" id="brutMaas" value="<?php echo number_format($bordro['brut_maas'], 2, ',', '.'); ?>" required>
                         <span class="input-group-text">₺</span>
                     </div>
                 </div>
-                <div class="col-md-6 mb-3">
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
                     <label class="form-label">SGK/Banka (₺)</label>
                     <div class="input-group">
                         <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="sgk_banka" id="sgkBanka" value="<?php echo number_format($bordro['sgk_banka'], 2, ',', '.'); ?>" required>
                         <span class="input-group-text">₺</span>
                     </div>
                 </div>
-                <div class="col-md-6 mb-3">
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
                     <label class="form-label">Nakit (₺)</label>
                     <div class="input-group">
                         <input type="text" class="form-control" id="nakitGoster" value="<?php echo formatMoney($bordro['nakit'] ?? ($bordro['brut_maas'] - $bordro['sgk_banka'])); ?>" readonly style="background-color: #e9ecef;">
@@ -113,32 +113,43 @@ if (isset($_GET['error'])) {
                     </div>
                     <small class="text-muted">Brüt Maaş - SGK/Banka (Otomatik hesaplanır)</small>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Ek Ödenek (₺)</label>
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
+                    <label class="form-label">Ek Ödenek (Banka) (₺)</label>
                     <div class="input-group">
-                        <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="ek_odenek" value="<?php echo number_format($bordro['ek_odenek'], 2, ',', '.'); ?>" required>
+                        <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="ek_odenek_banka" value="<?php echo number_format($bordro['ek_odenek_banka'] ?? 0, 2, ',', '.'); ?>">
                         <span class="input-group-text">₺</span>
                     </div>
+                </div>
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
+                    <label class="form-label">Ek Ödenek (Nakit) (₺)</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="ek_odenek_nakit" value="<?php echo number_format(($bordro['ek_odenek_nakit'] ?? ($bordro['ek_odenek'] ?? 0)), 2, ',', '.'); ?>">
+                        <span class="input-group-text">₺</span>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Bu Dönem Avans (Banka/Nakit)</label>
+                    <div class="form-control" id="avansInfo" style="background:#f8f9fa;">-</div>
                 </div>
                 <div class="col-md-3 mb-3">
                     <label class="form-label">İzin Günü</label>
                     <input type="number" step="0.5" class="form-control" name="izin_gunu" value="<?php echo $bordro['izin_gunu'] ?? 0; ?>">
                 </div>
-                <div class="col-md-3 mb-3">
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
                     <label class="form-label">İzin Kesintisi (₺)</label>
                     <div class="input-group">
                         <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="izin_kesintisi" value="<?php echo number_format($bordro['izin_kesintisi'] ?? 0, 2, ',', '.'); ?>">
                         <span class="input-group-text">₺</span>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
                     <label class="form-label">SGK Kesintisi (₺)</label>
                     <div class="input-group">
                         <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="sgk_kesintisi" value="<?php echo number_format($bordro['sgk_kesintisi'] ?? 0, 2, ',', '.'); ?>">
                         <span class="input-group-text">₺</span>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
+                <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
                     <label class="form-label">Diğer Kesintiler (₺)</label>
                     <div class="input-group">
                         <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="diger_kesintiler" value="<?php echo number_format($bordro['diger_kesintiler'] ?? 0, 2, ',', '.'); ?>">
@@ -293,6 +304,22 @@ document.addEventListener('DOMContentLoaded', function() {
     if (bordroPersonelSelect && brutMaasInput && sgkBankaInput) {
         // İlk yüklemede nakit'i hesapla
         hesaplaNakit();
+        // Avans bilgisini getir
+        (function guncelleAvansInfo(){
+            const pid = document.getElementById('personelSelect').value;
+            const ay = document.querySelector('select[name="ay"]').value;
+            const yil = document.querySelector('input[name="yil"]').value;
+            const box = document.getElementById('avansInfo');
+            if (!pid || !box) return;
+            fetch(`avans_ozet_api.php?personel_id=${pid}&ay=${ay}&yil=${yil}`)
+                .then(r=>r.json())
+                .then(d=>{
+                    const b = (d&&d.banka)?d.banka:0;
+                    const n = (d&&d.nakit)?d.nakit:0;
+                    box.textContent = `Banka: ${b.toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2})} ₺, Nakit: ${n.toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2})} ₺`;
+                })
+                .catch(()=>{ box.textContent='-'; });
+        })();
         
         bordroPersonelSelect.addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
@@ -315,6 +342,28 @@ document.addEventListener('DOMContentLoaded', function() {
         brutMaasInput.addEventListener('input', hesaplaNakit);
         sgkBankaInput.addEventListener('blur', hesaplaNakit);
         sgkBankaInput.addEventListener('input', hesaplaNakit);
+        // Ay/Yıl değişince avansı güncelle
+        const aySel = document.querySelector('select[name="ay"]');
+        const yilIn = document.querySelector('input[name="yil"]');
+        const perSel = document.getElementById('personelSelect');
+        const updateAvans = function(){
+            const pid = perSel.value;
+            const ay = aySel.value;
+            const yil = yilIn.value;
+            const box = document.getElementById('avansInfo');
+            if (!pid || !box) return;
+            fetch(`avans_ozet_api.php?personel_id=${pid}&ay=${ay}&yil=${yil}`)
+                .then(r=>r.json())
+                .then(d=>{
+                    const b = (d&&d.banka)?d.banka:0;
+                    const n = (d&&d.nakit)?d.nakit:0;
+                    box.textContent = `Banka: ${b.toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2})} ₺, Nakit: ${n.toLocaleString('tr-TR',{minimumFractionDigits:2, maximumFractionDigits:2})} ₺`;
+                })
+                .catch(()=>{ box.textContent='-'; });
+        };
+        if (aySel) aySel.addEventListener('change', updateAvans);
+        if (yilIn) yilIn.addEventListener('input', updateAvans);
+        if (perSel) perSel.addEventListener('change', updateAvans);
     }
     
     // main.js'nin otomatik formatlamasını engelle

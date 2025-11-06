@@ -43,10 +43,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $brut_maaslar_raw = $_POST['brut_maas_raw'] ?? [];
         $sgk_bankalar_raw = $_POST['sgk_banka_raw'] ?? [];
-        $ek_odenekler_raw = $_POST['ek_odenek_raw'] ?? [];
+        $ek_odenek_banka_raw = $_POST['ek_odenek_banka_raw'] ?? [];
+        $ek_odenek_nakit_raw = $_POST['ek_odenek_nakit_raw'] ?? [];
         $brut_maaslar = $_POST['brut_maas'] ?? [];
         $sgk_bankalar = $_POST['sgk_banka'] ?? [];
-        $ek_odenekler = $_POST['ek_odenek'] ?? [];
+        $ek_odenek_banka = $_POST['ek_odenek_banka'] ?? [];
+        $ek_odenek_nakit = $_POST['ek_odenek_nakit'] ?? [];
         $izin_gunleri = $_POST['izin_gunu'] ?? [];
         $izin_kesintileri_raw = $_POST['izin_kesintisi_raw'] ?? [];
         $sgk_kesintileri_raw = $_POST['sgk_kesintisi_raw'] ?? [];
@@ -63,9 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $stmt = $pdo->prepare("
             INSERT INTO bordro 
-            (personel_id, yil, ay, brut_maas, sgk_banka, ek_odenek, 
-             izin_gunu, izin_kesintisi, sgk_kesintisi, diger_kesintiler) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (personel_id, yil, ay, brut_maas, sgk_banka, ek_odenek, ek_odenek_banka, ek_odenek_nakit, 
+             izin_gunu, izin_kesintisi, sgk_kesintisi, diger_kesintiler, banka_avans, nakit_avans) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         $eklenenSayisi = 0;
@@ -82,11 +84,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Verileri hazırla
             $brut_maas = parseMoney($brut_maaslar_raw[$personel_id] ?? ($brut_maaslar[$personel_id] ?? 0));
             $sgk_banka = parseMoney($sgk_bankalar_raw[$personel_id] ?? ($sgk_bankalar[$personel_id] ?? 0));
-            $ek_odenek = parseMoney($ek_odenekler_raw[$personel_id] ?? ($ek_odenekler[$personel_id] ?? 0));
+            $eko_banka = parseMoney($ek_odenek_banka_raw[$personel_id] ?? ($ek_odenek_banka[$personel_id] ?? 0));
+            $eko_nakit = parseMoney($ek_odenek_nakit_raw[$personel_id] ?? ($ek_odenek_nakit[$personel_id] ?? 0));
+            $ek_odenek_toplam = $eko_banka + $eko_nakit;
             $izin_gunu = isset($izin_gunleri[$personel_id]) ? floatval($izin_gunleri[$personel_id]) : 0;
             $izin_kesintisi = parseMoney($izin_kesintileri_raw[$personel_id] ?? ($izin_kesintileri[$personel_id] ?? 0));
             $sgk_kesintisi = parseMoney($sgk_kesintileri_raw[$personel_id] ?? ($sgk_kesintileri[$personel_id] ?? 0));
             $diger_kesintiler_val = parseMoney($diger_kesintiler_raw[$personel_id] ?? ($diger_kesintiler[$personel_id] ?? 0));
+            
+            // Bu personelin ilgili ay/yıl avansları (önce bordro_ay/yil; yoksa tarih ay/yıl)
+            $avSorgu = $pdo->prepare("SELECT 
+                    COALESCE(SUM(banka_tutari),0) AS banka,
+                    COALESCE(SUM(nakit_tutari),0) AS nakit
+                FROM avans_takip 
+                WHERE personel_id = ? AND (
+                    (bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?)
+                )");
+            $avSorgu->execute([$personel_id, $ay, $yil, $ay, $yil]);
+            $avRow = $avSorgu->fetch() ?: ['banka'=>0,'nakit'=>0];
+            $banka_avans = (float)$avRow['banka'];
+            $nakit_avans = (float)$avRow['nakit'];
             
             $stmt->execute([
                 $personel_id,
@@ -94,11 +111,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ay,
                 $brut_maas,
                 $sgk_banka,
-                $ek_odenek,
+                $ek_odenek_toplam,
+                $eko_banka,
+                $eko_nakit,
                 $izin_gunu,
                 $izin_kesintisi,
                 $sgk_kesintisi,
-                $diger_kesintiler_val
+                $diger_kesintiler_val,
+                $banka_avans,
+                $nakit_avans
             ]);
             $eklenenSayisi++;
         }

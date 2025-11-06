@@ -27,6 +27,20 @@ try {
     foreach($stmt->fetchAll() as $row) {
         $mevcutBordrolar[] = $row['personel_id'];
     }
+
+    // Bu ayın avansları (kanal bazında) - tabloya bilgi amaçlı yansıt
+    $avansHarita = [];
+    $stmt = $pdo->prepare("SELECT personel_id, SUM(banka_tutari) AS banka, SUM(nakit_tutari) AS nakit
+                           FROM avans_takip
+                           WHERE ( (bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?) )
+                           GROUP BY personel_id");
+    $stmt->execute([$ay, $yil, $ay, $yil]);
+    foreach($stmt->fetchAll() as $row) {
+        $avansHarita[(int)$row['personel_id']] = [
+            'banka' => (float)($row['banka'] ?? 0),
+            'nakit' => (float)($row['nakit'] ?? 0)
+        ];
+    }
 } catch(PDOException $e) {
     $personeller = [];
     $mevcutBordrolar = [];
@@ -117,7 +131,8 @@ if (isset($_GET['error'])) {
                                 <th class="money">Maaş SGK</th>
                                 <th>Brüt Maaş</th>
                                 <th>SGK/Banka</th>
-                                <th>Ek Ödenek</th>
+                                <th>Ek Ödenek (Banka)</th>
+                                <th>Ek Ödenek (Nakit)</th>
                                 <th>İzin Günü</th>
                                 <th>İzin Kes.</th>
                                 <th>SGK Kes.</th>
@@ -141,6 +156,13 @@ if (isset($_GET['error'])) {
                                         <?php if($mevcutMu): ?>
                                             <small class="text-muted d-block">(Mevcut)</small>
                                         <?php endif; ?>
+                                        <?php
+                                            $aid = (int)$personelId;
+                                            $ab = $avansHarita[$aid]['banka'] ?? 0;
+                                            $an = $avansHarita[$aid]['nakit'] ?? 0;
+                                            if ($ab > 0 || $an > 0): ?>
+                                                <small class="text-muted d-block">Avans B/N: <?php echo formatMoney($ab); ?> / <?php echo formatMoney($an); ?></small>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="money"><?php echo formatMoney($personel['maas']); ?></td>
                                     <td class="money"><?php echo formatMoney($personel['maas_sgk']); ?></td>
@@ -162,10 +184,17 @@ if (isset($_GET['error'])) {
                                     </td>
                                     <td>
                                         <input type="text" class="form-control form-control-sm money-field" data-no-auto-format="true" pattern="[0-9.,]+" 
-                                               name="ek_odenek[<?php echo $personelId; ?>]" value="0,00" 
+                                               name="ek_odenek_banka[<?php echo $personelId; ?>]" value="0,00" 
                                                data-personel-id="<?php echo $personelId; ?>" 
                                                data-required="true">
-                                        <input type="hidden" name="ek_odenek_raw[<?php echo $personelId; ?>]" id="ek_odenek_raw_<?php echo $personelId; ?>" value="">
+                                        <input type="hidden" name="ek_odenek_banka_raw[<?php echo $personelId; ?>]" id="ek_odenek_banka_raw_<?php echo $personelId; ?>" value="">
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm money-field" data-no-auto-format="true" pattern="[0-9.,]+" 
+                                               name="ek_odenek_nakit[<?php echo $personelId; ?>]" value="0,00" 
+                                               data-personel-id="<?php echo $personelId; ?>" 
+                                               data-required="true">
+                                        <input type="hidden" name="ek_odenek_nakit_raw[<?php echo $personelId; ?>]" id="ek_odenek_nakit_raw_<?php echo $personelId; ?>" value="">
                                     </td>
                                     <td>
                                         <input type="number" step="0.5" class="form-control form-control-sm" 
@@ -372,7 +401,8 @@ if (isset($_GET['error'])) {
                     };
                     setHidden('brut_maas_raw', getVal('input[name="brut_maas['+personelId+']"]'));
                     setHidden('sgk_banka_raw', getVal('input[name="sgk_banka['+personelId+']"]'));
-                    setHidden('ek_odenek_raw', getVal('input[name="ek_odenek['+personelId+']"]'));
+                    setHidden('ek_odenek_banka_raw', getVal('input[name="ek_odenek_banka['+personelId+']"]'));
+                    setHidden('ek_odenek_nakit_raw', getVal('input[name="ek_odenek_nakit['+personelId+']"]'));
                     setHidden('izin_kesintisi_raw', getVal('input[name="izin_kesintisi['+personelId+']"]'));
                     setHidden('sgk_kesintisi_raw', getVal('input[name="sgk_kesintisi['+personelId+']"]'));
                     setHidden('diger_kesintiler_raw', getVal('input[name="diger_kesintiler['+personelId+']"]'));

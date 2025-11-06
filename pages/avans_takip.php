@@ -38,7 +38,10 @@ include '../includes/header.php';
                         <tr>
                             <th>Personel</th>
                             <th>Tarih</th>
-                            <th class="money">Avans Tutarı</th>
+                            <th>Bordro Dönemi</th>
+                            <th class="money">Avans (Banka)</th>
+                            <th class="money">Avans (Nakit)</th>
+                            <th class="money">Toplam</th>
                             <th>Açıklama</th>
                             <th>İşlemler</th>
                         </tr>
@@ -48,7 +51,10 @@ include '../includes/header.php';
                             <tr>
                                 <td><?php echo escape($avans['ad_soyad']); ?></td>
                                 <td><?php echo formatDate($avans['tarih']); ?></td>
-                                <td class="money"><?php echo formatMoney($avans['avans_tutari']); ?></td>
+                                <td><?php echo ($avans['bordro_ay'] && $avans['bordro_yil']) ? (getTurkishMonthName($avans['bordro_ay']).' '.$avans['bordro_yil']) : '-'; ?></td>
+                                <td class="money"><?php echo formatMoney((float)($avans['banka_tutari'] ?? 0)); ?></td>
+                                <td class="money"><?php echo formatMoney((float)($avans['nakit_tutari'] ?? 0)); ?></td>
+                                <td class="money"><?php echo formatMoney(((float)($avans['banka_tutari'] ?? 0) + (float)($avans['nakit_tutari'] ?? 0)) > 0 ? ((float)($avans['banka_tutari'] ?? 0) + (float)($avans['nakit_tutari'] ?? 0)) : (float)($avans['avans_tutari'] ?? 0)); ?></td>
                                 <td><?php echo escape($avans['aciklama']); ?></td>
                                 <td>
                                     <button class="btn btn-sm btn-warning" onclick="duzenleAvans(<?php echo $avans['id']; ?>)">
@@ -94,10 +100,32 @@ include '../includes/header.php';
                         <label class="form-label">Tarih</label>
                         <input type="date" class="form-control" name="tarih" value="<?php echo date('Y-m-d'); ?>" required>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Bordro Ayı</label>
+                            <select class="form-select" name="bordro_ay">
+                                <option value="">(Seçiniz)</option>
+                                <?php for($i=1;$i<=12;$i++): ?>
+                                    <option value="<?php echo $i; ?>" <?php echo ($i==(int)date('n'))?'selected':''; ?>><?php echo getTurkishMonthName($i); ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Bordro Yılı</label>
+                            <input type="number" class="form-control" name="bordro_yil" value="<?php echo date('Y'); ?>" min="2020" max="<?php echo date('Y')+1; ?>">
+                        </div>
+                    </div>
                     <div class="mb-3">
-                        <label class="form-label">Avans Tutarı (₺)</label>
+                        <label class="form-label">Banka Avansı (₺)</label>
                         <div class="input-group">
-                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="avans_tutari" value="0" required>
+                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="banka_tutari" value="0,00">
+                            <span class="input-group-text">₺</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nakit Avansı (₺)</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="nakit_tutari" value="0,00">
                             <span class="input-group-text">₺</span>
                         </div>
                     </div>

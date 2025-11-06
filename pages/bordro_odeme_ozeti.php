@@ -11,14 +11,21 @@ if ($yil < 2000 || $yil > 2100) $yil = date('Y');
 
 try {
     $stmt = $pdo->prepare("SELECT p.ad_soyad,
-        GREATEST(b.brut_maas + b.ek_odenek - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) as toplam_odenecek,
-        GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) as nakit_pay,
-        GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) as banka_pay
+        (GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) - COALESCE(b.nakit_avans, a.nakit_avans, 0) + COALESCE(b.ek_odenek_nakit,0)) as nakit_pay,
+        (GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) - COALESCE(b.banka_avans, a.banka_avans, 0) + COALESCE(b.ek_odenek_banka,0)) as banka_pay,
+        GREATEST((GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) - COALESCE(b.nakit_avans, a.nakit_avans, 0) + COALESCE(b.ek_odenek_nakit,0))
+               + (GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) - COALESCE(b.banka_avans, a.banka_avans, 0) + COALESCE(b.ek_odenek_banka,0)), 0) as toplam_odenecek
         FROM bordro b
         LEFT JOIN personel_listesi p ON b.personel_id = p.id
+        LEFT JOIN (
+            SELECT personel_id, SUM(banka_tutari) AS banka_avans, SUM(nakit_tutari) AS nakit_avans
+            FROM avans_takip
+            WHERE ( (bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?) )
+            GROUP BY personel_id
+        ) a ON a.personel_id = b.personel_id
         WHERE b.ay = ? AND b.yil = ?
         ORDER BY p.ad_soyad");
-    $stmt->execute([$ay, $yil]);
+    $stmt->execute([$ay, $yil, $ay, $yil, $ay, $yil]);
     $rows = $stmt->fetchAll();
 } catch(PDOException $e) {
     $rows = [];
@@ -29,9 +36,29 @@ include '../includes/header.php';
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-receipt"></i> Bordro Ödeme Özeti</h1>
+    <div class="no-print">
+        <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+            <i class="bi bi-printer"></i> PDF / Yazdır
+        </button>
+    </div>
 </div>
 
-<form class="row g-3 mb-4" method="GET">
+<style>
+@media print {
+    @page { size: A4; margin: 12mm; }
+    .no-print, .navbar, .btn-close { display: none !important; }
+    .card { border: none !important; box-shadow: none !important; }
+    .table { border-collapse: collapse !important; }
+    .table th, .table td { border: 1px solid #000 !important; }
+    a[href]:after { content: "" !important; }
+    body { color: #000 !important; }
+    /* Toplam özetini tek satır yap */
+    .summary-inline { display: block !important; text-align: center !important; }
+    .summary-inline .col-md-4 { display: inline-block !important; width: 32% !important; padding: 0 !important; margin: 0 !important; vertical-align: top !important; }
+}
+</style>
+
+<form class="row g-3 mb-4 no-print" method="GET">
     <div class="col-md-4">
         <label class="form-label">Ay</label>
         <select class="form-select" name="ay">
@@ -64,10 +91,13 @@ include '../includes/header.php';
     ?>
     <div class="card mb-3">
         <div class="card-body">
-            <div class="row text-center">
+            <div class="row text-center summary-inline">
                 <div class="col-md-4"><h6>Toplam Banka</h6><h4 class="text-success"><?php echo formatMoney($sumBanka); ?></h4></div>
                 <div class="col-md-4"><h6>Toplam Nakit</h6><h4 class="text-warning"><?php echo formatMoney($sumNakit); ?></h4></div>
                 <div class="col-md-4"><h6>Toplam Ödenecek</h6><h4 class="text-primary"><?php echo formatMoney($sumToplam); ?></h4></div>
+            </div>
+            <div class="text-center mt-3">
+                <small class="text-muted">Dönem: <?php echo getTurkishMonthName($ay) . ' ' . $yil; ?> · Oluşturma: <?php echo date('d.m.Y H:i'); ?></small>
             </div>
         </div>
     </div>

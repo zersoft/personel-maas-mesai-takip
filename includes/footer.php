@@ -1,7 +1,7 @@
     </div>
     <footer class="mt-5 py-4 bg-light">
         <div class="container-fluid text-center">
-            <p class="mb-0 text-muted">&copy; <?php echo date('Y'); ?> Personel Takip Sistemi. Tüm hakları saklıdır.</p>
+            <p class="mb-0 text-muted">&copy; <?php echo date('Y'); ?> <a class="text-dark" href="https://zersoft.net" target="_blank">ZERSOFT</a> Personel Takip Sistemi. Tüm hakları saklıdır.</p>
         </div>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

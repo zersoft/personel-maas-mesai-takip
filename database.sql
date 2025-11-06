@@ -33,12 +33,19 @@ CREATE TABLE bordro (
     sgk_banka DECIMAL(10,2) DEFAULT 0,
     nakit DECIMAL(10,2) GENERATED ALWAYS AS (brut_maas - sgk_banka) STORED,
     ek_odenek DECIMAL(10,2) DEFAULT 0,
+    ek_odenek_banka DECIMAL(10,2) DEFAULT 0,
+    ek_odenek_nakit DECIMAL(10,2) DEFAULT 0,
     izin_gunu DECIMAL(4,1) DEFAULT 0,
     izin_kesintisi DECIMAL(10,2) DEFAULT 0,
     sgk_kesintisi DECIMAL(10,2) DEFAULT 0,
     diger_kesintiler DECIMAL(10,2) DEFAULT 0,
+    banka_avans DECIMAL(10,2) DEFAULT 0,
+    nakit_avans DECIMAL(10,2) DEFAULT 0,
     kesinti_aciklama TEXT,
-    toplam_odenecek DECIMAL(10,2) GENERATED ALWAYS AS (brut_maas + ek_odenek - COALESCE(izin_kesintisi, 0) - COALESCE(sgk_kesintisi, 0) - COALESCE(diger_kesintiler, 0)) STORED,
+    toplam_odenecek DECIMAL(10,2) GENERATED ALWAYS AS (
+        GREATEST(brut_maas - (COALESCE(izin_kesintisi,0) + COALESCE(sgk_kesintisi,0) + COALESCE(diger_kesintiler,0)), 0)
+        + COALESCE(ek_odenek_banka,0) + COALESCE(ek_odenek_nakit,0)
+    ) STORED,
     aciklama TEXT,
     olusturma_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (personel_id) REFERENCES personel_listesi(id) ON DELETE CASCADE
@@ -63,7 +70,11 @@ CREATE TABLE avans_takip (
     id INT AUTO_INCREMENT PRIMARY KEY,
     personel_id INT NOT NULL,
     tarih DATE NOT NULL,
+    bordro_ay TINYINT NULL,
+    bordro_yil INT NULL,
     avans_tutari DECIMAL(10,2) DEFAULT 0,
+    banka_tutari DECIMAL(10,2) DEFAULT 0,
+    nakit_tutari DECIMAL(10,2) DEFAULT 0,
     aciklama TEXT,
     olusturma_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (personel_id) REFERENCES personel_listesi(id) ON DELETE CASCADE

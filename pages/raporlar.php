@@ -17,23 +17,41 @@ if ($yil < 2000 || $yil > 2100) {
 }
 
 try {
-    // Aylık bordro toplamı (toplam ödenecek) - negatif olamaz
-    $bordroToplam = $pdo->prepare("SELECT SUM(GREATEST(brut_maas + ek_odenek - (COALESCE(izin_kesintisi, 0) + COALESCE(sgk_kesintisi, 0) + COALESCE(diger_kesintiler, 0)), 0)) as toplam FROM bordro WHERE ay = ? AND yil = ?");
+    // Aylık bordro toplamı: (Brüt − Kesintiler) + Ek Ödenek (Banka + Nakit)
+    $bordroToplam = $pdo->prepare("SELECT SUM(GREATEST(brut_maas - (COALESCE(izin_kesintisi, 0) + COALESCE(sgk_kesintisi, 0) + COALESCE(diger_kesintiler, 0)), 0) + COALESCE(ek_odenek_banka,0) + COALESCE(ek_odenek_nakit,0)) as toplam FROM bordro WHERE ay = ? AND yil = ?");
     $bordroToplam->execute([$ay, $yil]);
     $bordroToplamSonuc = $bordroToplam->fetch()['toplam'] ?? 0;
     
-    // Aylık banka ödemesi toplamı: Kesinti önce nakitten (brüt−banka), kalanı bankadan
+    // Aylık banka ödemesi toplamı (avans banka düşülmüş): Kesinti önce nakitten, kalanı bankadan
     $bankaToplam = $pdo->prepare("SELECT SUM(
         GREATEST(
-            sgk_banka - GREATEST((COALESCE(izin_kesintisi,0)+COALESCE(sgk_kesintisi,0)+COALESCE(diger_kesintiler,0)) - (brut_maas - sgk_banka), 0)
+            b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0) - COALESCE(b.banka_avans, a.banka_avans, 0)
         , 0)
-    ) as toplam FROM bordro WHERE ay = ? AND yil = ?");
-    $bankaToplam->execute([$ay, $yil]);
+    ) + COALESCE(b.ek_odenek_banka,0) as toplam
+    FROM bordro b
+    LEFT JOIN (
+        SELECT personel_id, SUM(banka_tutari) AS banka_avans, SUM(nakit_tutari) AS nakit_avans
+        FROM avans_takip
+        WHERE ( (bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?) )
+        GROUP BY personel_id
+    ) a ON a.personel_id = b.personel_id
+    WHERE b.ay = ? AND b.yil = ?");
+    $bankaToplam->execute([$ay, $yil, $ay, $yil, $ay, $yil]);
     $bankaToplamSonuc = $bankaToplam->fetch()['toplam'] ?? 0;
     
-    // Aylık nakit ödemesi toplamı: (Nakit Baz - Kesinti)
-    $nakitToplam = $pdo->prepare("SELECT SUM(GREATEST((brut_maas - sgk_banka) - (COALESCE(izin_kesintisi,0)+COALESCE(sgk_kesintisi,0)+COALESCE(diger_kesintiler,0)), 0)) as toplam FROM bordro WHERE ay = ? AND yil = ?");
-    $nakitToplam->execute([$ay, $yil]);
+    // Aylık nakit ödemesi toplamı (avans nakit düşülmüş): (Nakit Baz - Kesinti) - avans_nakit
+    $nakitToplam = $pdo->prepare("SELECT SUM(
+        GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - COALESCE(b.nakit_avans, a.nakit_avans, 0), 0) + COALESCE(b.ek_odenek_nakit,0)
+    ) as toplam
+    FROM bordro b
+    LEFT JOIN (
+        SELECT personel_id, SUM(banka_tutari) AS banka_avans, SUM(nakit_tutari) AS nakit_avans
+        FROM avans_takip
+        WHERE ( (bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?) )
+        GROUP BY personel_id
+    ) a ON a.personel_id = b.personel_id
+    WHERE b.ay = ? AND b.yil = ?");
+    $nakitToplam->execute([$ay, $yil, $ay, $yil, $ay, $yil]);
     $nakitToplamSonuc = $nakitToplam->fetch()['toplam'] ?? 0;
 
     // Ek ödenek kartı kaldırıldı (ödemeler banka/nakit ayrımıyla listeleniyor)
@@ -43,8 +61,8 @@ try {
     $fmToplam->execute([$ay, $yil]);
     $fmToplamSonuc = $fmToplam->fetch()['toplam'] ?? 0;
     
-    // Aylık avans toplamı
-    $avansToplam = $pdo->prepare("SELECT SUM(avans_tutari) as toplam FROM avans_takip WHERE MONTH(tarih) = ? AND YEAR(tarih) = ?");
+    // Aylık avans toplamı (banka+nakit)
+    $avansToplam = $pdo->prepare("SELECT SUM(COALESCE(banka_tutari,0) + COALESCE(nakit_tutari,0)) as toplam FROM avans_takip WHERE MONTH(tarih) = ? AND YEAR(tarih) = ?");
     $avansToplam->execute([$ay, $yil]);
     $avansToplamSonuc = $avansToplam->fetch()['toplam'] ?? 0;
     
@@ -53,16 +71,23 @@ try {
     $tazminatToplam->execute([$ay, $yil]);
     $tazminatToplamSonuc = $tazminatToplam->fetch()['toplam'] ?? 0;
     
-    // Personel bazlı bordro listesi - kesinti önce nakit (brüt−banka), kalanı banka
+    // Personel bazlı bordro listesi - avans kanal bazında düşülmüş (bordro kolonları öncelikli)
     $personelBordro = $pdo->prepare("SELECT p.ad_soyad,
-        GREATEST(b.brut_maas + b.ek_odenek - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) as toplam_odenecek,
-        GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) as nakit_pay,
-        GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) as banka_pay
+        (GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) - COALESCE(b.nakit_avans, a.nakit_avans, 0) + COALESCE(b.ek_odenek_nakit,0)) AS nakit_pay,
+        (GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) - COALESCE(b.banka_avans, a.banka_avans, 0) + COALESCE(b.ek_odenek_banka,0)) AS banka_pay,
+        GREATEST((GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) - COALESCE(b.nakit_avans, a.nakit_avans, 0) + COALESCE(b.ek_odenek_nakit,0))
+               + (GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) - COALESCE(b.banka_avans, a.banka_avans, 0) + COALESCE(b.ek_odenek_banka,0)), 0) AS toplam_odenecek
         FROM bordro b
         LEFT JOIN personel_listesi p ON b.personel_id = p.id
+        LEFT JOIN (
+            SELECT personel_id, SUM(banka_tutari) AS banka_avans, SUM(nakit_tutari) AS nakit_avans
+            FROM avans_takip
+            WHERE ( (bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?) )
+            GROUP BY personel_id
+        ) a ON a.personel_id = b.personel_id
         WHERE b.ay = ? AND b.yil = ?
         ORDER BY p.ad_soyad");
-    $personelBordro->execute([$ay, $yil]);
+    $personelBordro->execute([$ay, $yil, $ay, $yil, $ay, $yil]);
     $personelBordroListe = $personelBordro->fetchAll();
     
 } catch(PDOException $e) {

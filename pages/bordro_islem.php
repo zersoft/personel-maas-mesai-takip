@@ -79,7 +79,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         $brut_maas = parseMoney($_POST['brut_maas_raw'] ?? ($_POST['brut_maas'] ?? 0));
         $sgk_banka = parseMoney($_POST['sgk_banka_raw'] ?? ($_POST['sgk_banka'] ?? 0));
-        $ek_odenek = parseMoney($_POST['ek_odenek_raw'] ?? ($_POST['ek_odenek'] ?? 0));
+        // Ek ödenek kanal bazında
+        $ek_odenek_banka = parseMoney($_POST['ek_odenek_banka_raw'] ?? ($_POST['ek_odenek_banka'] ?? 0));
+        $ek_odenek_nakit = parseMoney($_POST['ek_odenek_nakit_raw'] ?? ($_POST['ek_odenek_nakit'] ?? 0));
+        if (($ek_odenek_banka + $ek_odenek_nakit) == 0) {
+            $legacy_eko = parseMoney($_POST['ek_odenek'] ?? 0);
+            if ($legacy_eko > 0) { $ek_odenek_nakit = $legacy_eko; }
+        }
+        $ek_odenek = $ek_odenek_banka + $ek_odenek_nakit;
         $izin_gunu = isset($_POST['izin_gunu']) ? floatval($_POST['izin_gunu']) : 0;
         $izin_kesintisi = parseMoney($_POST['izin_kesintisi_raw'] ?? ($_POST['izin_kesintisi'] ?? 0));
         $sgk_kesintisi = parseMoney($_POST['sgk_kesintisi_raw'] ?? ($_POST['sgk_kesintisi'] ?? 0));
@@ -87,11 +94,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $kesinti_aciklama = isset($_POST['kesinti_aciklama']) ? trim($_POST['kesinti_aciklama']) : null;
         $aciklama = isset($_POST['aciklama']) ? trim($_POST['aciklama']) : null;
 
+        // İlgili dönem avanslarını hesapla (bordro_ay/yil öncelikli, yoksa tarih)
+        $avSorgu = $pdo->prepare("SELECT 
+                COALESCE(SUM(banka_tutari),0) AS banka,
+                COALESCE(SUM(nakit_tutari),0) AS nakit
+            FROM avans_takip 
+            WHERE personel_id = ? AND (
+                (bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?)
+            )");
+        $avSorgu->execute([$personel_id, $ay, $yil, $ay, $yil]);
+        $avRow = $avSorgu->fetch() ?: ['banka'=>0,'nakit'=>0];
+        $banka_avans = (float)$avRow['banka'];
+        $nakit_avans = (float)$avRow['nakit'];
+
         $stmt = $pdo->prepare("
             UPDATE bordro SET
                 personel_id = ?, yil = ?, ay = ?, brut_maas = ?, sgk_banka = ?, 
-                ek_odenek = ?, izin_gunu = ?, izin_kesintisi = ?, 
-                sgk_kesintisi = ?, diger_kesintiler = ?, kesinti_aciklama = ?, aciklama = ?
+                ek_odenek = ?, ek_odenek_banka = ?, ek_odenek_nakit = ?,
+                izin_gunu = ?, izin_kesintisi = ?, 
+                sgk_kesintisi = ?, diger_kesintiler = ?, kesinti_aciklama = ?, aciklama = ?,
+                banka_avans = ?, nakit_avans = ?
             WHERE id = ?
         ");
 
@@ -102,12 +124,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $brut_maas,
             $sgk_banka,
             $ek_odenek,
+            $ek_odenek_banka,
+            $ek_odenek_nakit,
             $izin_gunu,
             $izin_kesintisi,
             $sgk_kesintisi,
             $diger_kesintiler,
             $kesinti_aciklama ?: null,
             $aciklama ?: null,
+            $banka_avans,
+            $nakit_avans,
             $id
         ]);
 
@@ -167,7 +193,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $brut_maas = parseMoney($_POST['brut_maas_raw'] ?? ($_POST['brut_maas'] ?? 0));
         $sgk_banka = parseMoney($_POST['sgk_banka_raw'] ?? ($_POST['sgk_banka'] ?? 0));
-        $ek_odenek = parseMoney($_POST['ek_odenek_raw'] ?? ($_POST['ek_odenek'] ?? 0));
+        // Ek ödenek kanal bazında
+        $ek_odenek_banka = parseMoney($_POST['ek_odenek_banka_raw'] ?? ($_POST['ek_odenek_banka'] ?? 0));
+        $ek_odenek_nakit = parseMoney($_POST['ek_odenek_nakit_raw'] ?? ($_POST['ek_odenek_nakit'] ?? 0));
+        if (($ek_odenek_banka + $ek_odenek_nakit) == 0) {
+            $legacy_eko = parseMoney($_POST['ek_odenek'] ?? 0);
+            if ($legacy_eko > 0) { $ek_odenek_nakit = $legacy_eko; }
+        }
+        $ek_odenek = $ek_odenek_banka + $ek_odenek_nakit;
         $izin_gunu = $_POST['izin_gunu'] ?? 0;
         $izin_kesintisi = parseMoney($_POST['izin_kesintisi_raw'] ?? ($_POST['izin_kesintisi'] ?? 0));
         $sgk_kesintisi = parseMoney($_POST['sgk_kesintisi_raw'] ?? ($_POST['sgk_kesintisi'] ?? 0));
@@ -179,11 +212,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('Personel seçilmedi');
         }
 
+        // Bu personelin ilgili ay/yıl avansları (önce bordro_ay/yil; yoksa tarih ay/yıl)
+        $avSorgu = $pdo->prepare("SELECT 
+                COALESCE(SUM(banka_tutari),0) AS banka,
+                COALESCE(SUM(nakit_tutari),0) AS nakit
+            FROM avans_takip 
+            WHERE personel_id = ? AND (
+                (bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?)
+            )");
+        $avSorgu->execute([$personel_id, $ay, $yil, $ay, $yil]);
+        $avRow = $avSorgu->fetch() ?: ['banka'=>0,'nakit'=>0];
+        $banka_avans = (float)$avRow['banka'];
+        $nakit_avans = (float)$avRow['nakit'];
+
         $stmt = $pdo->prepare("
             INSERT INTO bordro 
-            (personel_id, yil, ay, brut_maas, sgk_banka, ek_odenek, 
-             izin_gunu, izin_kesintisi, sgk_kesintisi, diger_kesintiler, kesinti_aciklama, aciklama) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (personel_id, yil, ay, brut_maas, sgk_banka, ek_odenek, ek_odenek_banka, ek_odenek_nakit,
+             izin_gunu, izin_kesintisi, sgk_kesintisi, diger_kesintiler, kesinti_aciklama, aciklama, banka_avans, nakit_avans) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         $stmt->execute([
@@ -193,12 +239,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $brut_maas,
             $sgk_banka,
             $ek_odenek,
+            $ek_odenek_banka,
+            $ek_odenek_nakit,
             $izin_gunu,
             $izin_kesintisi,
             $sgk_kesintisi,
             $diger_kesintiler,
             $kesinti_aciklama ?: null,
-            $aciklama ?: null
+            $aciklama ?: null,
+            $banka_avans,
+            $nakit_avans
         ]);
 
         ob_end_clean(); // Output buffer'ı temizle

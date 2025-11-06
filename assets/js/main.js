@@ -45,12 +45,12 @@ function odemeYap(id) {
 }
 
 function duzenleAvans(id) {
-    alert('Avans düzenleme özelliği yakında eklenecek. ID: ' + id);
+    window.location.href = 'avans_duzenle.php?id=' + id;
 }
 
 function silAvans(id) {
     if (confirm('Bu avans kaydını silmek istediğinize emin misiniz?')) {
-        alert('Avans silme özelliği yakında eklenecek. ID: ' + id);
+        window.location.href = 'avans_islem.php?action=delete&id=' + id;
     }
 }
 
