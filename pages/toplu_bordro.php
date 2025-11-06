@@ -120,17 +120,29 @@ if (isset($_GET['error'])) {
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-bordered">
+                    <style>
+                    /* Yalnız bu tablo için kompakt görünüm */
+                    #toplu-bordro-table.table-sm td.col-personel,
+                    #toplu-bordro-table.table-sm th.col-personel { font-size: .95rem; }
+                    #toplu-bordro-table.table-sm td.col-maas,
+                    #toplu-bordro-table.table-sm th.col-maas,
+                    #toplu-bordro-table.table-sm td.col-maas-sgk,
+                    #toplu-bordro-table.table-sm th.col-maas-sgk { font-size: .95rem; white-space: nowrap; }
+                    #toplu-bordro-table .col-maas { width: 140px; }
+                    #toplu-bordro-table .col-maas-sgk { width: 140px; }
+                    #toplu-bordro-table .col-personel { width: 260px; }
+                    </style>
+                    <table id="toplu-bordro-table" class="table table-bordered table-sm">
                         <thead>
                             <tr>
                                 <th width="40">
                                     <input type="checkbox" id="selectAllCheckbox" checked onchange="toggleAll(this)">
                                 </th>
-                                <th>Personel</th>
-                                <th class="money">Maaş</th>
-                                <th class="money">Maaş SGK</th>
+                                <th class="col-personel">Personel</th>
+                                <th class="money col-maas">Maaş</th>
+                                <th class="money col-maas-sgk">Maaş SGK</th>
                                 <th>Brüt Maaş</th>
-                                <th>SGK/Banka</th>
+                                <th>Banka</th>
                                 <th>Ek Ödenek (Banka)</th>
                                 <th>Ek Ödenek (Nakit)</th>
                                 <th>İzin Günü</th>
@@ -151,7 +163,7 @@ if (isset($_GET['error'])) {
                                                name="selected_personel[]" value="<?php echo $personelId; ?>" 
                                                checked>
                                     </td>
-                                    <td>
+                                    <td class="col-personel">
                                         <?php echo escape($personel['ad_soyad']); ?>
                                         <?php if($mevcutMu): ?>
                                             <small class="text-muted d-block">(Mevcut)</small>
@@ -164,8 +176,8 @@ if (isset($_GET['error'])) {
                                                 <small class="text-muted d-block">Avans B/N: <?php echo formatMoney($ab); ?> / <?php echo formatMoney($an); ?></small>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="money"><?php echo formatMoney($personel['maas']); ?></td>
-                                    <td class="money"><?php echo formatMoney($personel['maas_sgk']); ?></td>
+                                    <td class="money col-maas"><?php echo formatMoney($personel['maas']); ?></td>
+                                    <td class="money col-maas-sgk"><?php echo formatMoney($personel['maas_sgk']); ?></td>
                                     <td>
                                         <input type="text" class="form-control form-control-sm money-field" data-no-auto-format="true" pattern="[0-9.,]+" 
                                                name="brut_maas[<?php echo $personelId; ?>]" 

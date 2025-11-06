@@ -65,13 +65,8 @@ try {
     $nakitToplamStmt->execute([$defaultAy, $defaultYil, $defaultAy, $defaultYil, $defaultAy, $defaultYil]);
     $miniNakit = (float)($nakitToplamStmt->fetch()['toplam'] ?? 0);
 
-    // Toplam ödenecek: (brüt − kesintiler) + ek_odenek(banka+nakit)
-    $toplamStmt = $pdo->prepare("SELECT SUM(
-        GREATEST(b.brut_maas - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0)
-        + COALESCE(b.ek_odenek_banka,0) + COALESCE(b.ek_odenek_nakit,0)
-    ) as toplam FROM bordro b WHERE b.ay = ? AND b.yil = ?");
-    $toplamStmt->execute([$defaultAy, $defaultYil]);
-    $miniToplam = (float)($toplamStmt->fetch()['toplam'] ?? 0);
+    // Genel toplam: Banka + Nakit (kanal bazlı ödemelerin toplamı)
+    $miniToplam = $miniBanka + $miniNakit;
 } catch (PDOException $e) {
     $miniBanka = 0;
     $miniNakit = 0;
@@ -152,17 +147,21 @@ if (isset($_GET['error'])) {
     <div class="card">
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <style>
+                /* Ek Ödenek ve Kesintiler sütunlarını daha flu göster */
+                #bordro-table td.col-muted, #bordro-table th.col-muted { color: #6c757d; }
+                </style>
+                <table id="bordro-table" class="table table-hover">
                     <thead>
                         <tr>
                             <th>Personel</th>
                             <th>Ay</th>
                             <th>Yıl</th>
                             <th class="money">Brüt Maaş</th>
-                            <th class="money">SGK/Banka</th>
+                            <th class="money col-muted">Ek Ödenek</th>
+                            <th class="money col-muted">Kesintiler</th>
+                            <th class="money">Banka</th>
                             <th class="money">Nakit</th>
-                            <th class="money">Ek Ödenek</th>
-                            <th class="money">Kesintiler</th>
                             <th class="money">Toplam Ödenecek</th>
                             <th>İşlemler</th>
                         </tr>
@@ -177,27 +176,67 @@ if (isset($_GET['error'])) {
                         $toplam_kesintiler = 0;
                         $toplam_odenecek = 0;
 
-                        foreach ($bordrolar as $bordro):
+                        foreach ($bordrolar as $bordro): 
                             $toplam_brut_maas += $bordro['brut_maas'];
-                            $toplam_sgk_banka += $bordro['sgk_banka'];
-                            $nakit_deger = $bordro['nakit'] ?? ($bordro['brut_maas'] - $bordro['sgk_banka']);
-                            $toplam_nakit += $nakit_deger;
-                            $toplam_ek_odenek += $bordro['ek_odenek'];
-                            $toplamKesinti = ($bordro['izin_kesintisi'] ?? 0) + ($bordro['sgk_kesintisi'] ?? 0) + ($bordro['diger_kesintiler'] ?? 0);
+                            // Baz değerler
+                            $banka_baz = ($bordro['sgk_banka'] ?? 0);
+                            $nakit_baz = ($bordro['brut_maas'] - $banka_baz);
+                            // Ek ödenekleri (kanal bazında)
+                            $ekoB = ($bordro['ek_odenek_banka'] ?? 0);
+                            $ekoN = ($bordro['ek_odenek_nakit'] ?? 0);
+                            $toplam_ek_odenek += ($ekoB + $ekoN);
+                            // Kesintiler: izin + sgk + diğer + avanslar (banka+nakit)
+                            $izinK = ($bordro['izin_kesintisi'] ?? 0);
+                            $sgkK = ($bordro['sgk_kesintisi'] ?? 0);
+                            $digerK = ($bordro['diger_kesintiler'] ?? 0);
+                            $avB = ($bordro['banka_avans'] ?? 0);
+                            $avN = ($bordro['nakit_avans'] ?? 0);
+                            $kesintiTop = $izinK + $sgkK + $digerK; // Avans hariç
+                            // Kesinti dağıtımı: önce nakitten, kalanı bankadan
+                            $nakit_after_kesinti = max($nakit_baz - $kesintiTop, 0);
+                            $banka_after_kesinti = max($banka_baz - max($kesintiTop - $nakit_baz, 0), 0);
+                            // Avansı kanalından düş
+                            $nakit_net = max($nakit_after_kesinti - $avN, 0);
+                            $banka_net = max($banka_after_kesinti - $avB, 0);
+                            // Ek ödenekleri ilgili kanala ekle
+                            $banka_net += $ekoB;
+                            $nakit_net += $ekoN;
+                            // Alt toplamlar
+                            $toplam_sgk_banka += $banka_net;
+                            $toplam_nakit += $nakit_net;
+                            $toplamKesinti = $izinK + $sgkK + $digerK + $avB + $avN;
                             $toplam_kesintiler += $toplamKesinti;
-                            $toplam_odenecek_deger = $bordro['toplam_odenecek'] ?? ($bordro['toplam_odeme'] ?? 0);
-                            $toplam_odenecek += $toplam_odenecek_deger;
+
+                            // Toplam ödenecek (satır): ekranda görünen Banka Net + Nakit Net
+                            $satir_toplam_odenecek = $banka_net + $nakit_net;
+                            $toplam_odenecek += $satir_toplam_odenecek;
                         ?>
                             <tr>
                                 <td><?php echo escape($bordro['ad_soyad']); ?></td>
                                 <td><?php echo getTurkishMonthName($bordro['ay']); ?></td>
                                 <td><?php echo escape($bordro['yil']); ?></td>
                                 <td class="money"><?php echo formatMoney($bordro['brut_maas']); ?></td>
-                                <td class="money"><?php echo formatMoney($bordro['sgk_banka']); ?></td>
-                                <td class="money"><?php echo formatMoney($nakit_deger); ?></td>
-                                <td class="money"><?php echo formatMoney($bordro['ek_odenek']); ?></td>
-                                <td class="money"><?php echo formatMoney($toplamKesinti); ?></td>
-                                <td class="money"><?php echo formatMoney($toplam_odenecek_deger); ?></td>
+                                <?php $ekoTooltip = '<div>Banka: '.formatMoney($ekoB).'</div>'.'<div>Nakit: '.formatMoney($ekoN).'</div>'; ?>
+                                <td class="money col-muted">
+                                    <span data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" title="<?php echo $ekoTooltip; ?>">
+                                        <?php echo formatMoney($ekoB + $ekoN); ?>
+                                    </span>
+                                </td>
+                                <?php 
+                                    $tooltip = '<div>İzin: '.formatMoney($izinK).'</div>'
+                                              .'<div>SGK: '.formatMoney($sgkK).'</div>'
+                                              .'<div>Diğer: '.formatMoney($digerK).'</div>'
+                                              .'<div>Avans (Banka): '.formatMoney($avB).'</div>'
+                                              .'<div>Avans (Nakit): '.formatMoney($avN).'</div>';
+                                ?>
+                                <td class="money col-muted">
+                                    <span data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" title="<?php echo $tooltip; ?>">
+                                        <?php echo formatMoney($toplamKesinti); ?>
+                                    </span>
+                                </td>
+                                <td class="money"><?php echo formatMoney($banka_net); ?></td>
+                                <td class="money"><?php echo formatMoney($nakit_net); ?></td>
+                                <td class="money"><?php echo formatMoney($satir_toplam_odenecek); ?></td>
                                 <td>
                                     <button class="btn btn-sm btn-info" onclick="gosterBordro(<?php echo $bordro['id']; ?>)">
                                         <i class="bi bi-eye"></i>
@@ -216,10 +255,10 @@ if (isset($_GET['error'])) {
                         <tr class="table-primary">
                             <th colspan="3" class="text-end">TOPLAM:</th>
                             <th class="money"><?php echo formatMoney($toplam_brut_maas); ?></th>
-                            <th class="money"><?php echo formatMoney($toplam_sgk_banka); ?></th>
-                            <th class="money"><?php echo formatMoney($toplam_nakit); ?></th>
                             <th class="money"><?php echo formatMoney($toplam_ek_odenek); ?></th>
                             <th class="money"><?php echo formatMoney($toplam_kesintiler); ?></th>
+                            <th class="money"><?php echo formatMoney($toplam_sgk_banka); ?></th>
+                            <th class="money"><?php echo formatMoney($toplam_nakit); ?></th>
                             <th class="money"><?php echo formatMoney($toplam_odenecek); ?></th>
                             <th></th>
                         </tr>
@@ -283,7 +322,7 @@ if (isset($_GET['error'])) {
                             </div>
                         </div>
                         <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
-                            <label class="form-label">SGK/Banka (₺)</label>
+                            <label class="form-label">Banka (₺)</label>
                             <div class="input-group">
                                 <input type="text" class="form-control money-field" name="sgk_banka" id="sgkBanka" value="0" pattern="[0-9.,]+" required>
                                 <span class="input-group-text">₺</span>
@@ -535,6 +574,16 @@ if (isset($_GET['error'])) {
             });
         }
     });
+</script>
+
+<script>
+// Tooltipleri aktif et
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function (el) { new bootstrap.Tooltip(el); });
+    } catch (e) {}
+});
 </script>
 
 <?php include '../includes/footer.php'; ?>

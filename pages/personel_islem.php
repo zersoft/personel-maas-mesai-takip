@@ -2,20 +2,45 @@
 require_once '../config/db.php';
 require_once '../includes/functions.php';
 
-// Silme işlemi
+ob_start();
+
+function safeRedirect($url) {
+    if (ob_get_level() > 0) { @ob_end_clean(); }
+    header('Location: ' . $url);
+    echo '<!doctype html><html><head><meta charset="utf-8">'
+        . '<meta http-equiv="refresh" content="0;url=' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' 
+        . '</head><body>'
+        . '<script>location.replace(' . json_encode($url) . ');</script>'
+        . '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">Yönlendiriliyorsunuz...</a>'
+        . '</body></html>';
+    exit;
+}
+
+// Silme işlemi (soft delete)
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     try {
         $id = (int)$_GET['id']; // SQL injection koruması için integer cast
         if ($id <= 0) {
             throw new Exception('Geçersiz ID');
         }
-        $stmt = $pdo->prepare("DELETE FROM personel_listesi WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE personel_listesi SET aktif = 0, silinme_tarihi = NOW() WHERE id = ?");
         $stmt->execute([$id]);
-        header('Location: personel_listesi.php?success=1');
-        exit;
+        safeRedirect('personel_listesi.php?success=' . urlencode('Personel silindi (geri alınabilir).'));
     } catch(PDOException $e) {
-        header('Location: personel_listesi.php?error=' . urlencode($e->getMessage()));
-        exit;
+        safeRedirect('personel_listesi.php?error=' . urlencode($e->getMessage()));
+    }
+}
+
+// Geri alma (restore)
+if (isset($_GET['action']) && $_GET['action'] === 'restore' && isset($_GET['id'])) {
+    try {
+        $id = (int)$_GET['id'];
+        if ($id <= 0) { throw new Exception('Geçersiz ID'); }
+        $stmt = $pdo->prepare("UPDATE personel_listesi SET aktif = 1, silinme_tarihi = NULL WHERE id = ?");
+        $stmt->execute([$id]);
+        safeRedirect('personel_listesi.php?durum=silinmis&success=' . urlencode('Personel geri alındı.'));
+    } catch(PDOException $e) {
+        safeRedirect('personel_listesi.php?error=' . urlencode($e->getMessage()));
     }
 }
 
@@ -59,14 +84,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $id
         ]);
 
-        header('Location: personel_listesi.php?success=1');
-        exit;
+        safeRedirect('personel_listesi.php?success=1');
     } catch(PDOException $e) {
-        header('Location: personel_duzenle.php?id=' . ($id ?? '') . '&error=' . urlencode($e->getMessage()));
-        exit;
+        safeRedirect('personel_duzenle.php?id=' . ($id ?? '') . '&error=' . urlencode($e->getMessage()));
     } catch(Exception $e) {
-        header('Location: personel_duzenle.php?id=' . ($id ?? '') . '&error=' . urlencode($e->getMessage()));
-        exit;
+        safeRedirect('personel_duzenle.php?id=' . ($id ?? '') . '&error=' . urlencode($e->getMessage()));
     }
 }
 
@@ -102,18 +124,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $aktif
         ]);
 
-        header('Location: personel_listesi.php?success=1');
-        exit;
+        safeRedirect('personel_listesi.php?success=1');
     } catch(PDOException $e) {
-        header('Location: personel_listesi.php?error=' . urlencode($e->getMessage()));
-        exit;
+        safeRedirect('personel_listesi.php?error=' . urlencode($e->getMessage()));
     } catch(Exception $e) {
-        header('Location: personel_listesi.php?error=' . urlencode($e->getMessage()));
-        exit;
+        safeRedirect('personel_listesi.php?error=' . urlencode($e->getMessage()));
     }
 } else {
-    header('Location: personel_listesi.php');
-    exit;
+    safeRedirect('personel_listesi.php');
 }
 ?>
 

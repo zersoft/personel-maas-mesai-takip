@@ -4,12 +4,21 @@ require_once '../includes/functions.php';
 
 $pageTitle = 'Avans Takibi';
 
-// Avans listesi
+// Bordro dönemi filtresi (Ay/Yıl)
+$ay = isset($_GET['ay']) ? (int)$_GET['ay'] : (int)date('n');
+$yil = isset($_GET['yil']) ? (int)$_GET['yil'] : (int)date('Y');
+if ($ay < 1 || $ay > 12) { $ay = (int)date('n'); }
+if ($yil < 2000 || $yil > 2100) { $yil = (int)date('Y'); }
+
+// Avans listesi (öncelik bordro_ay/yıl; yoksa tarih ay/yıl)
 try {
-    $stmt = $pdo->query("SELECT a.*, p.ad_soyad 
-                         FROM avans_takip a 
-                         LEFT JOIN personel_listesi p ON a.personel_id = p.id 
-                         ORDER BY a.tarih DESC");
+    $sql = "SELECT a.*, p.ad_soyad
+            FROM avans_takip a
+            LEFT JOIN personel_listesi p ON a.personel_id = p.id
+            WHERE ( (a.bordro_ay = ? AND a.bordro_yil = ?) OR (a.bordro_ay IS NULL AND a.bordro_yil IS NULL AND MONTH(a.tarih) = ? AND YEAR(a.tarih) = ?) )
+            ORDER BY a.tarih DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$ay, $yil, $ay, $yil]);
     $avanslar = $stmt->fetchAll();
 } catch(PDOException $e) {
     $avanslar = [];
@@ -20,9 +29,20 @@ include '../includes/header.php';
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-wallet2"></i> Avans Takibi</h1>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#avansEkleModal">
-        <i class="bi bi-plus-circle"></i> Avans Ekle
-    </button>
+    <div class="d-flex align-items-center gap-2">
+        <form method="GET" class="d-flex align-items-center gap-2">
+            <select class="form-select form-select-sm" name="ay" style="max-width: 150px;">
+                <?php for($i=1; $i<=12; $i++): ?>
+                    <option value="<?php echo $i; ?>" <?php echo ($i==$ay)?'selected':''; ?>><?php echo getTurkishMonthName($i); ?></option>
+                <?php endfor; ?>
+            </select>
+            <input type="number" class="form-control form-control-sm" name="yil" value="<?php echo $yil; ?>" min="2020" max="<?php echo date('Y')+1; ?>" style="max-width: 100px;">
+            <button class="btn btn-sm btn-outline-primary" type="submit">Filtrele</button>
+        </form>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#avansEkleModal">
+            <i class="bi bi-plus-circle"></i> Avans Ekle
+        </button>
+    </div>
 </div>
 
 <?php if (empty($avanslar)): ?>
@@ -116,16 +136,16 @@ include '../includes/header.php';
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Banka Avansı (₺)</label>
+                        <label class="form-label">Nakit Avansı (₺)</label>
                         <div class="input-group">
-                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="banka_tutari" value="0,00">
+                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="nakit_tutari" value="0,00">
                             <span class="input-group-text">₺</span>
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Nakit Avansı (₺)</label>
+                        <label class="form-label">Banka Avansı (₺)</label>
                         <div class="input-group">
-                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="nakit_tutari" value="0,00">
+                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="banka_tutari" value="0,00">
                             <span class="input-group-text">₺</span>
                         </div>
                     </div>

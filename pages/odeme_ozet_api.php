@@ -42,13 +42,8 @@ try {
     $nakitToplamStmt->execute([$ay, $yil, $ay, $yil, $ay, $yil]);
     $nakit = (float)($nakitToplamStmt->fetch()['toplam'] ?? 0);
 
-    $toplamStmt = $pdo->prepare("SELECT SUM(
-        GREATEST(b.brut_maas - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0)
-        + COALESCE(b.ek_odenek_banka,0) + COALESCE(b.ek_odenek_nakit,0)
-    ) as toplam FROM bordro b WHERE b.ay = ? AND b.yil = ?");
-    $toplamStmt->execute([$ay, $yil]);
-    $toplam = (float)($toplamStmt->fetch()['toplam'] ?? 0);
-
+    // Genel toplam: banka + nakit (kanal bazlı dağıtımın toplamı)
+    $toplam = $banka + $nakit;
     echo json_encode(['banka'=>$banka,'nakit'=>$nakit,'toplam'=>$toplam]);
 } catch (Throwable $e) {
     echo json_encode(['banka'=>0,'nakit'=>0,'toplam'=>0]);

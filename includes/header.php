@@ -45,6 +45,11 @@ $currentPage = basename($scriptPath);
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link <?php echo ($currentPage === 'personel_listesi.php' && (isset($_GET['durum']) && $_GET['durum']==='silinmis')) ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>personel_listesi.php?durum=silinmis">
+                            <i class="bi bi-archive"></i> Silinen Personeller
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link <?php echo ($currentPage === 'bordro.php') ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>bordro.php">
                             <i class="bi bi-cash-coin"></i> Bordro
                         </a>

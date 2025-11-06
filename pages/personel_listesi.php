@@ -8,6 +8,10 @@ $pageTitle = 'Personel Listesi';
 $filtre_ad_soyad = $_GET['filtre_ad_soyad'] ?? '';
 $filtre_pozisyon = $_GET['filtre_pozisyon'] ?? '';
 
+// Durum filtresi: aktif (varsayılan) | silinmis | tum
+$durum = $_GET['durum'] ?? 'aktif';
+if (!in_array($durum, ['aktif','silinmis','tum'], true)) { $durum = 'aktif'; }
+
 // Personel listesi (filtreleme ile)
 try {
     $sql = "SELECT * FROM personel_listesi WHERE 1=1";
@@ -23,6 +27,13 @@ try {
         $params[] = $filtre_pozisyon;
     }
     
+    // Durum koşulu uygula
+    if ($durum === 'aktif') {
+        $sql .= " AND aktif = 1";
+    } elseif ($durum === 'silinmis') {
+        $sql .= " AND aktif = 0";
+    }
+
     $sql .= " ORDER BY ad_soyad ASC";
     
     $stmt = $pdo->prepare($sql);
@@ -76,6 +87,14 @@ if (isset($_GET['error'])) {
                     <option value="_TAMİR" <?php echo $filtre_pozisyon === '_TAMİR' ? 'selected' : ''; ?>>_TAMİR</option>
                 </select>
             </div>
+            <div class="col-md-2">
+                <label class="form-label">Durum</label>
+                <select class="form-select" name="durum">
+                    <option value="aktif" <?php echo $durum==='aktif'?'selected':''; ?>>Aktif</option>
+                    <option value="silinmis" <?php echo $durum==='silinmis'?'selected':''; ?>>Silinmiş</option>
+                    <option value="tum" <?php echo $durum==='tum'?'selected':''; ?>>Tümü</option>
+                </select>
+            </div>
             <div class="col-md-2 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary w-100">
                     <i class="bi bi-search"></i> Ara
@@ -108,20 +127,24 @@ if (isset($_GET['error'])) {
     <div class="card">
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <style>
+                #personel-table.table-sm th, #personel-table.table-sm td { vertical-align: middle; }
+                #personel-table .col-name { width: 26%; }
+                #personel-table .col-actions { width: 110px; white-space: nowrap; }
+                </style>
+                <table id="personel-table" class="table table-hover table-sm">
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Ad Soyad</th>
+                            <th class="col-name">Ad Soyad</th>
                             <th>TC No</th>
                             <th>Pozisyon</th>
                             <th class="money">Maaş</th>
                             <th class="money">Maaş SGK</th>
-                            <th>İşe Giriş Tarihi</th>
-                            <th>Banka</th>
+                            <th>İşe Giriş</th>
                             <th class="money">Mesai Saat Ücreti</th>
                             <th>Durum</th>
-                            <th>İşlemler</th>
+                            <th class="col-actions">İşlemler</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -143,8 +166,7 @@ if (isset($_GET['error'])) {
                                 <td><?php echo escape($personel['pozisyon']); ?></td>
                                 <td class="money"><?php echo formatMoney($personel['maas']); ?></td>
                                 <td class="money"><?php echo formatMoney($personel['maas_sgk']); ?></td>
-                                <td><?php echo formatDate($personel['ise_giris_tarihi']); ?></td>
-                                <td><?php echo escape($personel['banka_adi']); ?></td>
+                                <td><?php $d=$personel['ise_giris_tarihi']??null; echo ($d && $d!=='0000-00-00') ? formatDate($d) : '-'; ?></td>
                                 <td class="money"><?php echo formatMoney($personel['mesai_saat_ucreti']); ?></td>
                                 <td>
                                     <?php if($personel['aktif']): ?>
@@ -153,13 +175,17 @@ if (isset($_GET['error'])) {
                                         <span class="badge bg-secondary">Pasif</span>
                                     <?php endif; ?>
                                 </td>
-                                <td>
-                                    <button class="btn btn-sm btn-warning" onclick="duzenlePersonel(<?php echo $personel['id']; ?>)">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-danger" onclick="silPersonel(<?php echo $personel['id']; ?>)">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                <td class="text-end">
+                                    <?php if($personel['aktif']): ?>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button class="btn btn-warning" title="Düzenle" onclick="duzenlePersonel(<?php echo $personel['id']; ?>)"><i class="bi bi-pencil"></i></button>
+                                            <button class="btn btn-danger" title="Sil" onclick="silPersonel(<?php echo $personel['id']; ?>)"><i class="bi bi-trash"></i></button>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button class="btn btn-success" title="Geri Al" onclick="geriAlPersonel(<?php echo $personel['id']; ?>)"><i class="bi bi-arrow-counterclockwise"></i></button>
+                                        </div>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -170,7 +196,7 @@ if (isset($_GET['error'])) {
                             <th class="money"><?php echo formatMoney($toplam_maas); ?></th>
                             <th class="money"><?php echo formatMoney($toplam_maas_sgk); ?></th>
                             <th colspan="3"></th>
-                            <th class="money"><?php echo formatMoney($toplam_mesai_ucreti); ?></th>
+                            <th class="money"></th>
                             <th colspan="2"></th>
                         </tr>
                     </tfoot>

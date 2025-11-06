@@ -20,6 +20,7 @@ CREATE TABLE personel_listesi (
     iban VARCHAR(26),
     mesai_saat_ucreti DECIMAL(6,2) DEFAULT 0,
     aktif BOOLEAN DEFAULT 1,
+    silinme_tarihi DATETIME NULL DEFAULT NULL,
     olusturma_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -11,9 +11,15 @@ function silPersonel(id) {
     }
 }
 
+function geriAlPersonel(id) {
+    if (confirm('Bu personeli geri almak istiyor musunuz?')) {
+        window.location.href = 'personel_islem.php?action=restore&id=' + id;
+    }
+}
+
 // Bordro işlemleri
 function gosterBordro(id) {
-    alert('Bordro detay görüntüleme özelliği yakında eklenecek. ID: ' + id);
+    window.location.href = 'bordro_detay.php?id=' + id;
 }
 
 function duzenleBordro(id) {
