@@ -5,7 +5,10 @@ require_once '../includes/functions.php';
 // Silme işlemi
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     try {
-        $id = $_GET['id'];
+        $id = (int)$_GET['id']; // SQL injection koruması için integer cast
+        if ($id <= 0) {
+            throw new Exception('Geçersiz ID');
+        }
         $stmt = $pdo->prepare("DELETE FROM fazla_mesai WHERE id = ?");
         $stmt->execute([$id]);
         header('Location: fazla_mesai.php?success=1');
@@ -19,12 +22,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
 // Güncelleme işlemi
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update') {
     try {
-        $id = $_POST['id'] ?? null;
-        if (!$id) {
-            throw new Exception('Fazla mesai ID bulunamadı');
+        $id = isset($_POST['id']) ? (int)$_POST['id'] : null; // SQL injection koruması için integer cast
+        if (!$id || $id <= 0) {
+            throw new Exception('Geçersiz fazla mesai ID');
         }
         
-        $personel_id = $_POST['personel_id'] ?? null;
+        $personel_id = isset($_POST['personel_id']) ? (int)$_POST['personel_id'] : null;
         $tarih = $_POST['tarih'] ?? null;
         $saat = $_POST['saat'] ?? 0;
         $saat_ucreti = $_POST['saat_ucreti'] ?? 0;
@@ -64,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        $personel_id = $_POST['personel_id'] ?? null;
+        $personel_id = isset($_POST['personel_id']) ? (int)$_POST['personel_id'] : null;
         $tarih = $_POST['tarih'] ?? null;
         $saat = $_POST['saat'] ?? 0;
         $saat_ucreti = $_POST['saat_ucreti'] ?? 0;

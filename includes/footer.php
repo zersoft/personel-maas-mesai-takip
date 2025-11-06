@@ -5,7 +5,14 @@
         </div>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="assets/js/main.js"></script>
+    <?php
+    // Base path'i header'dan almak için kontrol et
+    $scriptPath = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '';
+    $isInPages = (strpos($scriptPath, '/pages/') !== false);
+    $basePath = $isInPages ? '../' : '';
+    ?>
+    <?php $assetVersion = date('YmdHis'); ?>
+    <script src="<?php echo $basePath; ?>assets/js/main.js?v=<?php echo $assetVersion; ?>"></script>
 </body>
 </html>
 

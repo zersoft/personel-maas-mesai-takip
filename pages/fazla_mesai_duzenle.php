@@ -4,10 +4,10 @@ require_once '../includes/functions.php';
 
 $pageTitle = 'Fazla Mesai Düzenle';
 
-$id = isset($_GET['id']) ? $_GET['id'] : null;
+$id = isset($_GET['id']) ? (int)$_GET['id'] : null; // SQL injection koruması için integer cast
 
-if (!$id) {
-    header('Location: fazla_mesai.php?error=Fazla mesai ID bulunamadı');
+if (!$id || $id <= 0) {
+    header('Location: fazla_mesai.php?error=Geçersiz fazla mesai ID');
     exit;
 }
 
@@ -77,8 +77,11 @@ if (isset($_GET['error'])) {
             </div>
             
             <div class="mb-3">
-                <label class="form-label">Saat Ücreti</label>
-                <input type="number" step="0.01" class="form-control" name="saat_ucreti" id="saat_ucreti" value="<?php echo $fazlaMesai['saat_ucreti']; ?>" required>
+                <label class="form-label">Saat Ücreti (₺)</label>
+                <div class="input-group">
+                    <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="saat_ucreti" id="saat_ucreti" value="<?php echo $fazlaMesai['saat_ucreti']; ?>" required>
+                    <span class="input-group-text">₺</span>
+                </div>
             </div>
             
             <div class="mb-3">

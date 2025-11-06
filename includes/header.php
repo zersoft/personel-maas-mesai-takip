@@ -69,6 +69,11 @@ $currentPage = basename($scriptPath);
                             <i class="bi bi-graph-up"></i> Raporlar
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo ($currentPage === 'bordro_odeme_ozeti.php') ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>bordro_odeme_ozeti.php">
+                            <i class="bi bi-receipt"></i> Ödeme Özeti
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>

@@ -4,25 +4,39 @@ require_once '../includes/functions.php';
 
 $pageTitle = 'Raporlar';
 
-// Rapor verileri
-$ay = isset($_GET['ay']) ? $_GET['ay'] : date('n');
-$yil = isset($_GET['yil']) ? $_GET['yil'] : date('Y');
+// Rapor verileri - SQL injection koruması için integer cast ve validasyon
+$ay = isset($_GET['ay']) ? (int)$_GET['ay'] : date('n');
+$yil = isset($_GET['yil']) ? (int)$_GET['yil'] : date('Y');
+
+// Validasyon
+if ($ay < 1 || $ay > 12) {
+    $ay = date('n');
+}
+if ($yil < 2000 || $yil > 2100) {
+    $yil = date('Y');
+}
 
 try {
-    // Aylık bordro toplamı
-    $bordroToplam = $pdo->prepare("SELECT SUM(toplam_odeme) as toplam FROM bordro WHERE ay = ? AND yil = ?");
+    // Aylık bordro toplamı (toplam ödenecek) - negatif olamaz
+    $bordroToplam = $pdo->prepare("SELECT SUM(GREATEST(brut_maas + ek_odenek - (COALESCE(izin_kesintisi, 0) + COALESCE(sgk_kesintisi, 0) + COALESCE(diger_kesintiler, 0)), 0)) as toplam FROM bordro WHERE ay = ? AND yil = ?");
     $bordroToplam->execute([$ay, $yil]);
     $bordroToplamSonuc = $bordroToplam->fetch()['toplam'] ?? 0;
     
-    // Aylık banka ödemesi toplamı
-    $bankaToplam = $pdo->prepare("SELECT SUM(toplam_odeme) as toplam FROM bordro WHERE ay = ? AND yil = ? AND (odeme_tipi = 'BANKA' OR odeme_tipi IS NULL)");
+    // Aylık banka ödemesi toplamı: Kesinti önce nakitten (brüt−banka), kalanı bankadan
+    $bankaToplam = $pdo->prepare("SELECT SUM(
+        GREATEST(
+            sgk_banka - GREATEST((COALESCE(izin_kesintisi,0)+COALESCE(sgk_kesintisi,0)+COALESCE(diger_kesintiler,0)) - (brut_maas - sgk_banka), 0)
+        , 0)
+    ) as toplam FROM bordro WHERE ay = ? AND yil = ?");
     $bankaToplam->execute([$ay, $yil]);
     $bankaToplamSonuc = $bankaToplam->fetch()['toplam'] ?? 0;
     
-    // Aylık nakit ödemesi toplamı
-    $nakitToplam = $pdo->prepare("SELECT SUM(toplam_odeme) as toplam FROM bordro WHERE ay = ? AND yil = ? AND odeme_tipi = 'NAKIT'");
+    // Aylık nakit ödemesi toplamı: (Nakit Baz - Kesinti)
+    $nakitToplam = $pdo->prepare("SELECT SUM(GREATEST((brut_maas - sgk_banka) - (COALESCE(izin_kesintisi,0)+COALESCE(sgk_kesintisi,0)+COALESCE(diger_kesintiler,0)), 0)) as toplam FROM bordro WHERE ay = ? AND yil = ?");
     $nakitToplam->execute([$ay, $yil]);
     $nakitToplamSonuc = $nakitToplam->fetch()['toplam'] ?? 0;
+
+    // Ek ödenek kartı kaldırıldı (ödemeler banka/nakit ayrımıyla listeleniyor)
     
     // Aylık fazla mesai toplamı
     $fmToplam = $pdo->prepare("SELECT SUM(saat) as toplam FROM fazla_mesai WHERE MONTH(tarih) = ? AND YEAR(tarih) = ?");
@@ -39,12 +53,15 @@ try {
     $tazminatToplam->execute([$ay, $yil]);
     $tazminatToplamSonuc = $tazminatToplam->fetch()['toplam'] ?? 0;
     
-    // Personel bazlı bordro listesi
-    $personelBordro = $pdo->prepare("SELECT p.ad_soyad, b.toplam_odeme, b.odeme_tipi 
-                                     FROM bordro b 
-                                     LEFT JOIN personel_listesi p ON b.personel_id = p.id 
-                                     WHERE b.ay = ? AND b.yil = ? 
-                                     ORDER BY p.ad_soyad");
+    // Personel bazlı bordro listesi - kesinti önce nakit (brüt−banka), kalanı banka
+    $personelBordro = $pdo->prepare("SELECT p.ad_soyad,
+        GREATEST(b.brut_maas + b.ek_odenek - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) as toplam_odenecek,
+        GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) as nakit_pay,
+        GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) as banka_pay
+        FROM bordro b
+        LEFT JOIN personel_listesi p ON b.personel_id = p.id
+        WHERE b.ay = ? AND b.yil = ?
+        ORDER BY p.ad_soyad");
     $personelBordro->execute([$ay, $yil]);
     $personelBordroListe = $personelBordro->fetchAll();
     
@@ -72,7 +89,7 @@ include '../includes/header.php';
                 <select class="form-select" name="ay">
                     <?php for($i=1; $i<=12; $i++): ?>
                         <option value="<?php echo $i; ?>" <?php echo $i == $ay ? 'selected' : ''; ?>>
-                            <?php echo date('F', mktime(0,0,0,$i,1)); ?>
+                            <?php echo getTurkishMonthName($i); ?>
                         </option>
                     <?php endfor; ?>
                 </select>
@@ -112,14 +129,7 @@ include '../includes/header.php';
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-info">
-            <div class="card-body text-center">
-                <h6 class="card-title text-muted">Fazla Mesai (Saat)</h6>
-                <h3 class="text-info"><?php echo number_format($fmToplamSonuc, 1); ?></h3>
-            </div>
-        </div>
-    </div>
+    
 </div>
 
 <div class="row g-4 mb-4">
@@ -145,7 +155,7 @@ include '../includes/header.php';
     <div class="col-md-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Personel Bazlı Bordro Dağılımı - <?php echo date('F', mktime(0,0,0,$ay,1)) . ' ' . $yil; ?></h5>
+                <h5 class="mb-0">Personel Bazlı Bordro Dağılımı - <?php echo getTurkishMonthName($ay) . ' ' . $yil; ?></h5>
             </div>
             <div class="card-body">
                 <?php if (empty($personelBordroListe)): ?>
@@ -158,33 +168,27 @@ include '../includes/header.php';
                             <thead>
                                 <tr>
                                     <th>Personel</th>
-                                    <th>Toplam Ödeme</th>
-                                    <th>Ödeme Tipi</th>
+                                    <th class="money">Toplam Ödenecek</th>
+                                    <th class="money">Banka</th>
+                                    <th class="money">Nakit</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($personelBordroListe as $pb): ?>
                                     <tr>
                                         <td><?php echo escape($pb['ad_soyad']); ?></td>
-                                        <td><?php echo formatMoney($pb['toplam_odeme']); ?></td>
-                                        <td>
-                                            <?php if(isset($pb['odeme_tipi']) && $pb['odeme_tipi'] == 'NAKIT'): ?>
-                                                <span class="badge bg-success">NAKIT</span>
-                                            <?php else: ?>
-                                                <span class="badge bg-primary">BANKA</span>
-                                            <?php endif; ?>
-                                        </td>
+                                        <td class="money"><?php echo formatMoney($pb['toplam_odenecek']); ?></td>
+                                        <td class="money"><?php echo formatMoney($pb['banka_pay'] ?? 0); ?></td>
+                                        <td class="money"><?php echo formatMoney($pb['nakit_pay'] ?? 0); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
                             <tfoot>
                                 <tr class="table-primary">
                                     <th>Toplam</th>
-                                    <th><?php echo formatMoney($bordroToplamSonuc); ?></th>
-                                    <th>
-                                        <small>Banka: <?php echo formatMoney($bankaToplamSonuc); ?> | 
-                                        Nakit: <?php echo formatMoney($nakitToplamSonuc); ?></small>
-                                    </th>
+                                    <th class="money"><?php echo formatMoney($bordroToplamSonuc); ?></th>
+                                    <th class="money"><?php echo formatMoney($bankaToplamSonuc); ?></th>
+                                    <th class="money"><?php echo formatMoney($nakitToplamSonuc); ?></th>
                                 </tr>
                             </tfoot>
                         </table>

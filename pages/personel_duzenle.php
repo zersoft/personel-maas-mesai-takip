@@ -4,10 +4,10 @@ require_once '../includes/functions.php';
 
 $pageTitle = 'Personel Düzenle';
 
-$id = isset($_GET['id']) ? $_GET['id'] : null;
+$id = isset($_GET['id']) ? (int)$_GET['id'] : null; // SQL injection koruması için integer cast
 
-if (!$id) {
-    header('Location: personel_listesi.php?error=Personel ID bulunamadı');
+if (!$id || $id <= 0) {
+    header('Location: personel_listesi.php?error=Geçersiz personel ID');
     exit;
 }
 
@@ -66,12 +66,18 @@ if (isset($_GET['error'])) {
                     <input type="date" class="form-control" name="ise_giris_tarihi" value="<?php echo $personel['ise_giris_tarihi'] ?? ''; ?>">
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Maaş</label>
-                    <input type="number" step="0.01" class="form-control" name="maas" value="<?php echo $personel['maas']; ?>" required>
+                    <label class="form-label">Maaş (₺)</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="maas" value="<?php echo $personel['maas']; ?>" required>
+                        <span class="input-group-text">₺</span>
+                    </div>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Maaş SGK</label>
-                    <input type="number" step="0.01" class="form-control" name="maas_sgk" value="<?php echo $personel['maas_sgk']; ?>" required>
+                    <label class="form-label">Maaş SGK (₺)</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="maas_sgk" value="<?php echo $personel['maas_sgk']; ?>" required>
+                        <span class="input-group-text">₺</span>
+                    </div>
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Banka Adı</label>
@@ -82,8 +88,11 @@ if (isset($_GET['error'])) {
                     <input type="text" class="form-control" name="iban" value="<?php echo escape($personel['iban'] ?? ''); ?>" maxlength="26">
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Mesai Saat Ücreti</label>
-                    <input type="number" step="0.01" class="form-control" name="mesai_saat_ucreti" value="<?php echo $personel['mesai_saat_ucreti']; ?>" required>
+                    <label class="form-label">Mesai Saat Ücreti (₺)</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="mesai_saat_ucreti" value="<?php echo $personel['mesai_saat_ucreti']; ?>" required>
+                        <span class="input-group-text">₺</span>
+                    </div>
                 </div>
                 <div class="col-md-6 mb-3">
                     <div class="form-check mt-4">

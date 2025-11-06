@@ -38,7 +38,7 @@ include '../includes/header.php';
                         <tr>
                             <th>Personel</th>
                             <th>Tarih</th>
-                            <th>Avans Tutarı</th>
+                            <th class="money">Avans Tutarı</th>
                             <th>Açıklama</th>
                             <th>İşlemler</th>
                         </tr>
@@ -48,7 +48,7 @@ include '../includes/header.php';
                             <tr>
                                 <td><?php echo escape($avans['ad_soyad']); ?></td>
                                 <td><?php echo formatDate($avans['tarih']); ?></td>
-                                <td><?php echo formatMoney($avans['avans_tutari']); ?></td>
+                                <td class="money"><?php echo formatMoney($avans['avans_tutari']); ?></td>
                                 <td><?php echo escape($avans['aciklama']); ?></td>
                                 <td>
                                     <button class="btn btn-sm btn-warning" onclick="duzenleAvans(<?php echo $avans['id']; ?>)">
@@ -95,8 +95,11 @@ include '../includes/header.php';
                         <input type="date" class="form-control" name="tarih" value="<?php echo date('Y-m-d'); ?>" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Avans Tutarı</label>
-                        <input type="number" step="0.01" class="form-control" name="avans_tutari" value="0" required>
+                        <label class="form-label">Avans Tutarı (₺)</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="avans_tutari" value="0" required>
+                            <span class="input-group-text">₺</span>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Açıklama</label>

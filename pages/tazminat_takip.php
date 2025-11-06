@@ -40,7 +40,7 @@ include '../includes/header.php';
                             <th>Tarih</th>
                             <th>Plan</th>
                             <th>İşlem</th>
-                            <th>Tutar</th>
+                            <th class="money">Tutar</th>
                             <th>Açıklama</th>
                             <th>İşlemler</th>
                         </tr>
@@ -52,7 +52,7 @@ include '../includes/header.php';
                                 <td><?php echo $tazminat['tarih'] ? formatDate($tazminat['tarih']) : '-'; ?></td>
                                 <td><?php echo escape($tazminat['plan']); ?></td>
                                 <td><?php echo escape($tazminat['islem']); ?></td>
-                                <td><?php echo formatMoney($tazminat['tutar']); ?></td>
+                                <td class="money"><?php echo formatMoney($tazminat['tutar']); ?></td>
                                 <td><?php echo escape($tazminat['aciklama']); ?></td>
                                 <td>
                                     <button class="btn btn-sm btn-warning" onclick="duzenleTazminat(<?php echo $tazminat['id']; ?>)">
@@ -107,8 +107,11 @@ include '../includes/header.php';
                         <input type="text" class="form-control" name="islem">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Tutar</label>
-                        <input type="number" step="0.01" class="form-control" name="tutar" value="0" required>
+                        <label class="form-label">Tutar (₺)</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="tutar" value="0" required>
+                            <span class="input-group-text">₺</span>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Açıklama</label>

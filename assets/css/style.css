@@ -51,3 +51,41 @@ footer {
     border-radius: 0.375rem;
 }
 
+/* Para alanları sağa yaslı */
+input[type="number"].form-control.money-field,
+input[type="number"].form-control[step="0.01"],
+input[type="number"].form-control[step="0.5"][name*="gunu"] {
+    text-align: right;
+    direction: ltr;
+}
+
+/* Tablolarda para gösterimleri sağa yaslı */
+.table td.money,
+.table th.money {
+    text-align: right;
+}
+
+/* Para gösterimleri için genel stil */
+.money-cell {
+    text-align: right;
+    font-weight: 500;
+}
+
+/* Span içindeki para gösterimleri */
+span.money {
+    display: inline-block;
+    text-align: right;
+}
+
+/* Toplu bordro - seçili olmayan satırlar */
+.table tbody tr.row-disabled {
+    opacity: 0.5;
+    background-color: #f8f9fa;
+}
+
+.table tbody tr.row-disabled input,
+.table tbody tr.row-disabled select {
+    background-color: #e9ecef;
+    cursor: not-allowed;
+}
+

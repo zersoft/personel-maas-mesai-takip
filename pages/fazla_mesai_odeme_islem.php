@@ -4,7 +4,11 @@ require_once '../includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        $personel_id = $_POST['personel_id'] ?? null;
+        $personel_id = isset($_POST['personel_id']) ? (int)$_POST['personel_id'] : null;
+        
+        if (!$personel_id || $personel_id <= 0) {
+            throw new Exception('Geçersiz personel ID');
+        }
         $odeme_tarihi = $_POST['odeme_tarihi'] ?? date('Y-m-d');
         $odeme_tutari = $_POST['odeme_tutari'] ?? 0;
         $tamamini_ode = isset($_POST['tamamini_ode']) ? true : false;

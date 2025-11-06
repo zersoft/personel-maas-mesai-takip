@@ -113,5 +113,89 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // Para alanları için binlik ayracı formatlaması
+    function formatMoneyInput(value) {
+        if (!value || value === '0' || value === '') return '0';
+        // Ondalık kısmı ayır (virgül veya nokta)
+        let parts = value.toString().split(/[,.]/);
+        let integerPart = parts[0].replace(/\D/g, ''); // Sadece rakamları al
+        let decimalPart = parts[1] || '';
+        
+        // Binlik ayracı ekle
+        const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        
+        // Ondalık kısmı varsa virgül ile ekle
+        return decimalPart ? formattedInteger + ',' + decimalPart : formattedInteger;
+    }
+    
+    function parseMoneyInput(value) {
+        if (!value) return '0';
+        // Binlik ayraçlarını ve virgülü kaldır, noktayı virgüle çevir
+        let parsed = value.toString()
+            .replace(/\./g, '') // Binlik ayraçlarını kaldır
+            .replace(',', '.'); // Virgülü noktaya çevir (ondalık için)
+        return parsed;
+    }
+    
+    // Tüm para alanlarına formatlama ekle
+    document.querySelectorAll('.money-field').forEach(function(input) {
+        // Eğer bu input için otomatik formatlama devre dışı bırakılmışsa atla
+        if (input.getAttribute('data-no-auto-format') === 'true') {
+            return;
+        }
+        
+        // Sayfa yüklendiğinde formatla
+        if (input.value && input.value !== '0' && input.value !== '') {
+            input.value = formatMoneyInput(input.value);
+        }
+        
+        // Focus olduğunda (yazmaya başladığında) formatı temizle
+        input.addEventListener('focus', function() {
+            const rawValue = parseMoneyInput(this.value);
+            this.value = rawValue === '0' ? '' : rawValue;
+            this.select(); // Tüm metni seç
+        });
+        
+        // Blur olduğunda (odaktan çıktığında) formatla
+        input.addEventListener('blur', function() {
+            const rawValue = parseMoneyInput(this.value);
+            if (rawValue && rawValue !== '0') {
+                this.value = formatMoneyInput(rawValue);
+            } else {
+                this.value = '0';
+            }
+        });
+        
+        // Kullanıcı yazarken sadece rakam ve virgül/nokta kabul et
+        input.addEventListener('input', function(e) {
+            let value = this.value;
+            // Virgülü noktaya çevir (Türkçe klavye için)
+            value = value.replace(',', '.');
+            // Sadece rakam ve nokta bırak
+            value = value.replace(/[^\d.]/g, '');
+            // Birden fazla nokta varsa sadece ilkini bırak
+            const parts = value.split('.');
+            if (parts.length > 2) {
+                value = parts[0] + '.' + parts.slice(1).join('');
+            }
+            // Ondalık kısımda maksimum 2 rakam
+            if (parts.length === 2 && parts[1].length > 2) {
+                value = parts[0] + '.' + parts[1].substring(0, 2);
+            }
+            this.value = value;
+        });
+    });
+    
+    // Form submit edilmeden önce tüm para alanlarını temizle (binlik ayraçları kaldır)
+    document.querySelectorAll('form').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            const moneyInputs = form.querySelectorAll('.money-field');
+            moneyInputs.forEach(function(input) {
+                const rawValue = parseMoneyInput(input.value);
+                input.value = rawValue || '0';
+            });
+        });
+    });
 });
 

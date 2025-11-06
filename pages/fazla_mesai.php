@@ -67,9 +67,9 @@ if (isset($_GET['error'])) {
                     <tr>
                         <th>Personel</th>
                         <th>Toplam Saat</th>
-                        <th>Toplam Tutar</th>
+                        <th class="money">Toplam Tutar</th>
                         <th>Ödenmeyen Saat</th>
-                        <th>Ödenmeyen Tutar</th>
+                        <th class="money">Ödenmeyen Tutar</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -77,11 +77,11 @@ if (isset($_GET['error'])) {
                     <tr>
                         <td><?php echo escape($toplam['ad_soyad']); ?></td>
                         <td><?php echo number_format($toplam['toplam_saat'], 2); ?></td>
-                        <td><?php echo formatMoney($toplam['toplam_tutar']); ?></td>
+                        <td class="money"><?php echo formatMoney($toplam['toplam_tutar']); ?></td>
                         <td class="<?php echo $toplam['odenmeyen_saat'] > 0 ? 'text-warning' : ''; ?>">
                             <?php echo number_format($toplam['odenmeyen_saat'], 2); ?>
                         </td>
-                        <td class="<?php echo $toplam['odenmeyen_tutar'] > 0 ? 'text-warning' : ''; ?>">
+                        <td class="money <?php echo $toplam['odenmeyen_tutar'] > 0 ? 'text-warning' : ''; ?>">
                             <?php echo formatMoney($toplam['odenmeyen_tutar']); ?>
                         </td>
                     </tr>
@@ -107,8 +107,8 @@ if (isset($_GET['error'])) {
                             <th>Personel</th>
                             <th>Tarih</th>
                             <th>Süre (Saat)</th>
-                            <th>Saat Ücreti</th>
-                            <th>Tutar</th>
+                            <th class="money">Saat Ücreti</th>
+                            <th class="money">Tutar</th>
                             <th>Ödendi</th>
                             <th>Açıklama</th>
                             <th>İşlemler</th>
@@ -120,8 +120,8 @@ if (isset($_GET['error'])) {
                                 <td><?php echo escape($fm['ad_soyad']); ?></td>
                                 <td><?php echo formatDate($fm['tarih']); ?></td>
                                 <td><?php echo escape($fm['saat']); ?></td>
-                                <td><?php echo formatMoney($fm['saat_ucreti']); ?></td>
-                                <td><?php echo formatMoney($fm['tutar']); ?></td>
+                                <td class="money"><?php echo formatMoney($fm['saat_ucreti']); ?></td>
+                                <td class="money"><?php echo formatMoney($fm['tutar']); ?></td>
                                 <td>
                                     <?php if($fm['odendi']): ?>
                                         <span class="badge bg-success">Ödendi</span>
@@ -187,7 +187,10 @@ if (isset($_GET['error'])) {
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Saat Ücreti</label>
-                        <input type="number" step="0.01" class="form-control" name="saat_ucreti" id="saat_ucreti" value="0" required>
+                        <div class="input-group">
+                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="saat_ucreti" id="saat_ucreti" value="0" required>
+                            <span class="input-group-text">₺</span>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <div class="form-check">

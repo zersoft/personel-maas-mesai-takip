@@ -4,10 +4,10 @@ require_once '../includes/functions.php';
 
 $pageTitle = 'Fazla Mesai Ödeme';
 
-$personel_id = isset($_GET['personel_id']) ? $_GET['personel_id'] : null;
+$personel_id = isset($_GET['personel_id']) ? (int)$_GET['personel_id'] : null; // SQL injection koruması için integer cast
 
-if (!$personel_id) {
-    header('Location: fazla_mesai.php?error=Personel seçilmedi');
+if (!$personel_id || $personel_id <= 0) {
+    header('Location: fazla_mesai.php?error=Geçersiz personel ID');
     exit;
 }
 
@@ -66,8 +66,8 @@ if (isset($_GET['error'])) {
                         <tr>
                             <th>Tarih</th>
                             <th>Saat</th>
-                            <th>Saat Ücreti</th>
-                            <th>Tutar</th>
+                            <th class="money">Saat Ücreti</th>
+                            <th class="money">Tutar</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -75,15 +75,15 @@ if (isset($_GET['error'])) {
                             <tr>
                                 <td><?php echo formatDate($fm['tarih']); ?></td>
                                 <td><?php echo $fm['saat']; ?></td>
-                                <td><?php echo formatMoney($fm['saat_ucreti']); ?></td>
-                                <td><?php echo formatMoney($fm['tutar']); ?></td>
+                                <td class="money"><?php echo formatMoney($fm['saat_ucreti']); ?></td>
+                                <td class="money"><?php echo formatMoney($fm['tutar']); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                     <tfoot>
                         <tr class="table-primary">
                             <th colspan="3">Toplam</th>
-                            <th><?php echo formatMoney($toplamTutar); ?></th>
+                            <th class="money"><?php echo formatMoney($toplamTutar); ?></th>
                         </tr>
                     </tfoot>
                 </table>
@@ -105,9 +105,12 @@ if (isset($_GET['error'])) {
                 </div>
                 
                 <div class="mb-3">
-                    <label class="form-label">Ödeme Tutarı</label>
-                    <input type="number" step="0.01" class="form-control" name="odeme_tutari" 
-                           value="<?php echo $toplamTutar; ?>" max="<?php echo $toplamTutar; ?>" required>
+                    <label class="form-label">Ödeme Tutarı (₺)</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="odeme_tutari" 
+                               value="<?php echo $toplamTutar; ?>" max="<?php echo $toplamTutar; ?>" required>
+                        <span class="input-group-text">₺</span>
+                    </div>
                     <small class="text-muted">Maksimum: <?php echo formatMoney($toplamTutar); ?></small>
                 </div>
                 

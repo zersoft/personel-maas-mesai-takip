@@ -5,7 +5,10 @@ require_once '../includes/functions.php';
 // Silme işlemi
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     try {
-        $id = $_GET['id'];
+        $id = (int)$_GET['id']; // SQL injection koruması için integer cast
+        if ($id <= 0) {
+            throw new Exception('Geçersiz ID');
+        }
         $stmt = $pdo->prepare("DELETE FROM personel_listesi WHERE id = ?");
         $stmt->execute([$id]);
         header('Location: personel_listesi.php?success=1');
@@ -19,9 +22,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
 // Güncelleme işlemi
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update') {
     try {
-        $id = $_POST['id'] ?? null;
-        if (!$id) {
-            throw new Exception('Personel ID bulunamadı');
+        $id = isset($_POST['id']) ? (int)$_POST['id'] : null; // SQL injection koruması için integer cast
+        if (!$id || $id <= 0) {
+            throw new Exception('Geçersiz personel ID');
         }
         
         $ad_soyad = $_POST['ad_soyad'] ?? '';
