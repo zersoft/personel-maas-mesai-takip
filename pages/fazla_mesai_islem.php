@@ -2,6 +2,36 @@
 require_once '../config/db.php';
 require_once '../includes/functions.php';
 
+// Çıktı tamponu: yönlendirme sorunlarını engelle
+if (ob_get_level() === 0) { ob_start(); }
+
+// Para/numara formatlarını güvenli parse eden yardımcı
+function parseMoneyLocal($value) {
+    if ($value === null || $value === '' || $value === false) return 0;
+    $value = (string)$value;
+    $value = str_replace('₺', '', $value);
+    $value = trim($value);
+    if ($value === '') return 0;
+    if (strpos($value, ',') !== false) {
+        // TR format: binlik nokta, ondalık virgül
+        $value = str_replace('.', '', $value);
+        $value = str_replace(',', '.', $value);
+    } else {
+        // EN format veya sade sayı: son nokta ondalık kabul edilir
+        $parts = explode('.', $value);
+        if (count($parts) > 1) {
+            $last = array_pop($parts);
+            if (strlen($last) <= 2) {
+                $value = implode('', $parts) . '.' . $last;
+            } else {
+                $value = implode('', $parts) . $last;
+            }
+        }
+    }
+    $value = preg_replace('/[^0-9.]/', '', $value);
+    return (float)$value;
+}
+
 // Silme işlemi
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     try {
@@ -11,11 +41,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
         }
         $stmt = $pdo->prepare("DELETE FROM fazla_mesai WHERE id = ?");
         $stmt->execute([$id]);
-        header('Location: fazla_mesai.php?success=1');
-        exit;
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai.php?success=1');
     } catch(PDOException $e) {
-        header('Location: fazla_mesai.php?error=' . urlencode($e->getMessage()));
-        exit;
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai.php?error=' . urlencode($e->getMessage()));
     }
 }
 
@@ -29,13 +59,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         $personel_id = isset($_POST['personel_id']) ? (int)$_POST['personel_id'] : null;
         $tarih = $_POST['tarih'] ?? null;
-        $saat = $_POST['saat'] ?? 0;
-        $saat_ucreti = $_POST['saat_ucreti'] ?? 0;
+        $saat = isset($_POST['saat']) ? (float)$_POST['saat'] : 0;
+        $saat_ucreti = isset($_POST['saat_ucreti_raw'])
+            ? parseMoneyLocal($_POST['saat_ucreti_raw'])
+            : parseMoneyLocal($_POST['saat_ucreti'] ?? 0);
         $odendi = isset($_POST['odendi']) ? 1 : 0;
         $aciklama = $_POST['aciklama'] ?? null;
 
         if (!$personel_id || !$tarih) {
             throw new Exception('Personel ve tarih seçilmedi');
+        }
+
+        // Sunucu tarafı doğrulama (şema sınırları ile uyumlu)
+        if ($saat < 0) { $saat = 0; }
+        if ($saat > 999.99) { $saat = 999.99; } // DECIMAL(5,2)
+        if ($saat_ucreti < 0) { $saat_ucreti = 0; }
+        if ($saat_ucreti > 9999.99) {
+            throw new Exception('Saat ücreti çok yüksek (maksimum 9.999,99 ₺).');
         }
 
         $stmt = $pdo->prepare("
@@ -54,14 +94,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $id
         ]);
 
-        header('Location: fazla_mesai.php?success=1');
-        exit;
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai.php?success=1');
     } catch(PDOException $e) {
-        header('Location: fazla_mesai_duzenle.php?id=' . ($id ?? '') . '&error=' . urlencode($e->getMessage()));
-        exit;
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai_duzenle.php?id=' . ($id ?? '') . '&error=' . urlencode($e->getMessage()));
     } catch(Exception $e) {
-        header('Location: fazla_mesai_duzenle.php?id=' . ($id ?? '') . '&error=' . urlencode($e->getMessage()));
-        exit;
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai_duzenle.php?id=' . ($id ?? '') . '&error=' . urlencode($e->getMessage()));
     }
 }
 
@@ -69,13 +109,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $personel_id = isset($_POST['personel_id']) ? (int)$_POST['personel_id'] : null;
         $tarih = $_POST['tarih'] ?? null;
-        $saat = $_POST['saat'] ?? 0;
-        $saat_ucreti = $_POST['saat_ucreti'] ?? 0;
+        $saat = isset($_POST['saat']) ? (float)$_POST['saat'] : 0;
+        $saat_ucreti = isset($_POST['saat_ucreti_raw'])
+            ? parseMoneyLocal($_POST['saat_ucreti_raw'])
+            : parseMoneyLocal($_POST['saat_ucreti'] ?? 0);
         $odendi = isset($_POST['odendi']) ? 1 : 0;
         $aciklama = $_POST['aciklama'] ?? null;
 
         if (!$personel_id || !$tarih) {
             throw new Exception('Personel ve tarih seçilmedi');
+        }
+
+        // Sunucu tarafı doğrulama (şema sınırları ile uyumlu)
+        if ($saat < 0) { $saat = 0; }
+        if ($saat > 999.99) { $saat = 999.99; } // DECIMAL(5,2)
+        if ($saat_ucreti < 0) { $saat_ucreti = 0; }
+        if ($saat_ucreti > 9999.99) {
+            throw new Exception('Saat ücreti çok yüksek (maksimum 9.999,99 ₺).');
         }
 
         $stmt = $pdo->prepare("
@@ -93,18 +143,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $aciklama ?: null
         ]);
 
-        header('Location: fazla_mesai.php?success=1');
-        exit;
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai.php?success=1');
     } catch(PDOException $e) {
-        header('Location: fazla_mesai.php?error=' . urlencode($e->getMessage()));
-        exit;
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai.php?error=' . urlencode($e->getMessage()));
     } catch(Exception $e) {
-        header('Location: fazla_mesai.php?error=' . urlencode($e->getMessage()));
-        exit;
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai.php?error=' . urlencode($e->getMessage()));
     }
 } else {
-    header('Location: fazla_mesai.php');
-    exit;
+    if (ob_get_level() > 0) { @ob_end_clean(); }
+    safeRedirect('fazla_mesai.php');
 }
 ?>
 

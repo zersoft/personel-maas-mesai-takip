@@ -198,6 +198,10 @@ document.addEventListener('DOMContentLoaded', function() {
         form.addEventListener('submit', function(e) {
             const moneyInputs = form.querySelectorAll('.money-field');
             moneyInputs.forEach(function(input) {
+                // Bu input sayfa özel formatlama/ham değer gönderimi kullanıyorsa atla
+                if (input.getAttribute('data-no-auto-format') === 'true') {
+                    return;
+                }
                 const rawValue = parseMoneyInput(input.value);
                 input.value = rawValue || '0';
             });

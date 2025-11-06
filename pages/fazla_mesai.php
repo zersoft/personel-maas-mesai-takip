@@ -50,9 +50,14 @@ if (isset($_GET['error'])) {
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-clock-history"></i> Fazla Mesai Takibi</h1>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#fazlaMesaiEkleModal">
-        <i class="bi bi-plus-circle"></i> Fazla Mesai Ekle
-    </button>
+    <div class="d-flex gap-2">
+        <a href="fazla_mesai_odeme_listesi.php" class="btn btn-outline-secondary">
+            <i class="bi bi-receipt"></i> Ödeme Listesi
+        </a>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#fazlaMesaiEkleModal">
+            <i class="bi bi-plus-circle"></i> Fazla Mesai Ekle
+        </button>
+    </div>
 </div>
 
 <?php if (!empty($kumulatifToplamlar)): ?>
@@ -188,7 +193,8 @@ if (isset($_GET['error'])) {
                     <div class="mb-3">
                         <label class="form-label">Saat Ücreti</label>
                         <div class="input-group">
-                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="saat_ucreti" id="saat_ucreti" value="0" required>
+                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="saat_ucreti" id="saat_ucreti" value="0" data-no-auto-format="true" inputmode="decimal" required>
+                            <input type="hidden" name="saat_ucreti_raw" id="saat_ucreti_raw" value="0">
                             <span class="input-group-text">₺</span>
                         </div>
                     </div>
@@ -213,4 +219,43 @@ if (isset($_GET['error'])) {
 </div>
 
 <?php include '../includes/footer.php'; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('#fazlaMesaiEkleModal form');
+    const saatUcreti = document.getElementById('saat_ucreti');
+    const saatUcretiRaw = document.getElementById('saat_ucreti_raw');
+    // TR ve EN formatlarını güvenle parse et
+    function parseMoneyLocalJS(val) {
+        if (!val) return '0';
+        val = val.toString().trim().replace('₺','');
+        if (val.indexOf(',') !== -1 && val.indexOf('.') !== -1) {
+            // TR: binlik nokta, ondalık virgül
+            val = val.replace(/\./g, '').replace(',', '.');
+        } else if (val.indexOf(',') !== -1) {
+            // Sadece virgül varsa: virgülü ondalık kabul et
+            val = val.replace(/\./g, '');
+            val = val.replace(',', '.');
+        } else {
+            // Nokta varsa: son noktayı ondalık kabul et, diğerlerini kaldır
+            const parts = val.split('.');
+            if (parts.length > 1) {
+                const last = parts.pop();
+                if (last.length <= 2) {
+                    val = parts.join('') + '.' + last;
+                } else {
+                    val = parts.join('') + last;
+                }
+            }
+        }
+        val = val.replace(/[^0-9.]/g, '');
+        return val || '0';
+    }
+    if (form && saatUcreti && saatUcretiRaw) {
+        form.addEventListener('submit', function() {
+            saatUcretiRaw.value = parseMoneyLocalJS(saatUcreti.value);
+        });
+    }
+});
+</script>
 

@@ -79,7 +79,8 @@ if (isset($_GET['error'])) {
             <div class="mb-3">
                 <label class="form-label">Saat Ücreti (₺)</label>
                 <div class="input-group">
-                    <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="saat_ucreti" id="saat_ucreti" value="<?php echo $fazlaMesai['saat_ucreti']; ?>" required>
+                    <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="saat_ucreti" id="saat_ucreti" value="<?php echo $fazlaMesai['saat_ucreti']; ?>" data-no-auto-format="true" inputmode="decimal" required>
+                    <input type="hidden" name="saat_ucreti_raw" id="saat_ucreti_raw" value="<?php echo $fazlaMesai['saat_ucreti']; ?>">
                     <span class="input-group-text">₺</span>
                 </div>
             </div>
@@ -131,4 +132,42 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <?php include '../includes/footer.php'; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form[action=\"fazla_mesai_islem.php\"]');
+    const saatUcreti = document.getElementById('saat_ucreti');
+    const saatUcretiRaw = document.getElementById('saat_ucreti_raw');
+    function parseMoneyLocalJS(val) {
+        if (!val) return '0';
+        val = val.toString().trim().replace('₺','');
+        if (val.indexOf(',') !== -1 && val.indexOf('.') !== -1) {
+            // TR: binlik nokta, ondalık virgül
+            val = val.replace(/\./g, '').replace(',', '.');
+        } else if (val.indexOf(',') !== -1) {
+            // Sadece virgül varsa: virgülü ondalık kabul et
+            val = val.replace(/\./g, '');
+            val = val.replace(',', '.');
+        } else {
+            // Nokta varsa: son noktayı ondalık kabul et, diğerlerini kaldır
+            const parts = val.split('.');
+            if (parts.length > 1) {
+                const last = parts.pop();
+                if (last.length <= 2) {
+                    val = parts.join('') + '.' + last;
+                } else {
+                    val = parts.join('') + last;
+                }
+            }
+        }
+        val = val.replace(/[^0-9.]/g, '');
+        return val || '0';
+    }
+    if (form && saatUcreti && saatUcretiRaw) {
+        form.addEventListener('submit', function() {
+            saatUcretiRaw.value = parseMoneyLocalJS(saatUcreti.value);
+        });
+    }
+});
+</script>
 

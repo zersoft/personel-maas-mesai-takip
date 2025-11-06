@@ -138,3 +138,46 @@ if (isset($_GET['error'])) {
 
 <?php include '../includes/footer.php'; ?>
 
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">Ödeme Geçmişi</h5>
+    </div>
+    <div class="card-body">
+        <?php
+        try {
+            $odemeStmt = $pdo->prepare("SELECT odeme_tarihi, tutar, aciklama, odeme_zamani FROM fazla_mesai_odeme WHERE personel_id = ? ORDER BY odeme_zamani DESC");
+            $odemeStmt->execute([$personel_id]);
+            $odemeler = $odemeStmt->fetchAll();
+        } catch(PDOException $e) {
+            $odemeler = [];
+        }
+        ?>
+        <?php if (empty($odemeler)): ?>
+            <div class="text-muted">Bu personel için ödeme kaydı bulunmuyor.</div>
+        <?php else: ?>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Ödeme Tarihi</th>
+                            <th class="money">Tutar</th>
+                            <th>Not</th>
+                            <th>Kaydedilme Zamanı</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($odemeler as $o): ?>
+                            <tr>
+                                <td><?php echo formatDate($o['odeme_tarihi']); ?></td>
+                                <td class="money"><?php echo formatMoney((float)$o['tutar']); ?></td>
+                                <td><?php echo escape($o['aciklama'] ?? ''); ?></td>
+                                <td><?php echo date('d.m.Y H:i', strtotime($o['odeme_zamani'])); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
+
