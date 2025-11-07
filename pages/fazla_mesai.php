@@ -9,6 +9,8 @@ $mode = isset($_GET['mode']) ? $_GET['mode'] : 'bugun';
 $baslangic = isset($_GET['baslangic']) ? $_GET['baslangic'] : date('Y-m-d');
 $bitis = isset($_GET['bitis']) ? $_GET['bitis'] : date('Y-m-d');
 $personel_filtre = isset($_GET['personel_id']) ? (int)$_GET['personel_id'] : 0;
+$ay = isset($_GET['ay']) ? (int)$_GET['ay'] : (int)date('n');
+$yil = isset($_GET['yil']) ? (int)$_GET['yil'] : (int)date('Y');
 
 // Filtrelenmiş FM listesi ve kümülatif toplamlar
 try {
@@ -37,6 +39,10 @@ try {
         $sqlFiltre .= " AND MONTH(fm.tarih) = ? AND YEAR(fm.tarih) = ?";
         $paramsFiltre[] = (int)date('n');
         $paramsFiltre[] = (int)date('Y');
+    } elseif ($mode === 'donem') {
+        $sqlFiltre .= " AND MONTH(fm.tarih) = ? AND YEAR(fm.tarih) = ?";
+        $paramsFiltre[] = $ay;
+        $paramsFiltre[] = $yil;
     } elseif ($mode === 'tarih') {
         $sqlFiltre .= " AND fm.tarih BETWEEN ? AND ?";
         $paramsFiltre[] = $baslangic;
@@ -97,6 +103,10 @@ try {
         $sqlOdeme .= " AND MONTH(odeme_tarihi) = ? AND YEAR(odeme_tarihi) = ?";
         $paramsOdeme[] = (int)date('n');
         $paramsOdeme[] = (int)date('Y');
+    } elseif ($mode === 'donem') {
+        $sqlOdeme .= " AND MONTH(odeme_tarihi) = ? AND YEAR(odeme_tarihi) = ?";
+        $paramsOdeme[] = $ay;
+        $paramsOdeme[] = $yil;
     } elseif ($mode === 'tarih') {
         $sqlOdeme .= " AND odeme_tarihi BETWEEN ? AND ?";
         $paramsOdeme[] = $baslangic;
@@ -162,12 +172,11 @@ if (isset($_GET['error'])) {
 
 <!-- Filtre -->
 <div class="card mb-3">
-    <div class="card-body">
-        <form method="GET" class="row g-2 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label">Personel</label>
-                <select class="form-select" name="personel_id" id="personelFiltre">
-                    <option value="0">Tümü</option>
+    <div class="card-body py-2">
+        <form method="GET" class="d-flex gap-2 align-items-center flex-wrap">
+            <div style="min-width: 200px;">
+                <select class="form-select form-select-sm" name="personel_id" id="personelFiltre">
+                    <option value="0">Tüm Personel</option>
                     <?php
                     try {
                         $personelListesi = $pdo->query("SELECT id, ad_soyad FROM personel_listesi WHERE aktif = 1 ORDER BY ad_soyad")->fetchAll();
@@ -179,29 +188,35 @@ if (isset($_GET['error'])) {
                     <?php endforeach; } catch(PDOException $e) {} ?>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">Filtre Tipi</label>
-                <select class="form-select" name="mode" id="modeSelect">
+            <div style="min-width: 150px;">
+                <select class="form-select form-select-sm" name="mode" id="modeSelect">
                     <option value="bugun" <?php echo $mode==='bugun'?'selected':''; ?>>Bugün</option>
                     <option value="bu_hafta" <?php echo $mode==='bu_hafta'?'selected':''; ?>>Bu Hafta</option>
                     <option value="bu_ay" <?php echo $mode==='bu_ay'?'selected':''; ?>>Bu Ay</option>
+                    <option value="donem" <?php echo $mode==='donem'?'selected':''; ?>>Dönem</option>
                     <option value="tarih" <?php echo $mode==='tarih'?'selected':''; ?>>Tarih Aralığı</option>
                 </select>
             </div>
-            <div id="tarihInputs" class="col-md-5 d-flex gap-2" style="<?php echo $mode==='tarih'?'':'display:none;'; ?>">
-                <div class="flex-fill">
-                    <label class="form-label">Başlangıç</label>
-                    <input type="date" class="form-control" name="baslangic" value="<?php echo $baslangic; ?>">
-                </div>
-                <div class="flex-fill">
-                    <label class="form-label">Bitiş</label>
-                    <input type="date" class="form-control" name="bitis" value="<?php echo $bitis; ?>">
-                </div>
+            <div id="donemInputs" class="d-flex gap-2" style="<?php echo $mode==='donem'?'':'display:none;'; ?>">
+                <select class="form-select form-select-sm" name="ay" style="width: 110px;">
+                    <?php for($i=1;$i<=12;$i++): ?>
+                        <option value="<?php echo $i; ?>" <?php echo $i==$ay?'selected':''; ?>><?php echo getTurkishMonthName($i); ?></option>
+                    <?php endfor; ?>
+                </select>
+                <select class="form-select form-select-sm" name="yil" style="width: 90px;">
+                    <?php for($y=date('Y'); $y>=date('Y')-5; $y--): ?>
+                        <option value="<?php echo $y; ?>" <?php echo $y==$yil?'selected':''; ?>><?php echo $y; ?></option>
+                    <?php endfor; ?>
+                </select>
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary">Filtrele</button>
+            <div id="tarihInputs" class="d-flex gap-2" style="<?php echo $mode==='tarih'?'':'display:none;'; ?>">
+                <input type="date" class="form-control form-control-sm" name="baslangic" value="<?php echo $baslangic; ?>" style="width: 150px;">
+                <input type="date" class="form-control form-control-sm" name="bitis" value="<?php echo $bitis; ?>" style="width: 150px;">
+            </div>
+            <div class="ms-auto d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filtrele</button>
                 <?php if ($mode !== 'bugun' || $personel_filtre > 0): ?>
-                    <a href="fazla_mesai.php" class="btn btn-outline-secondary">Temizle</a>
+                    <a href="fazla_mesai.php" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle"></i> Temizle</a>
                 <?php endif; ?>
             </div>
         </form>
@@ -222,15 +237,26 @@ document.addEventListener('DOMContentLoaded', function() {
         width: '100%'
     });
     
-    // Mod değişiminde tarih alanlarını göster/gizle
-    document.getElementById('modeSelect')?.addEventListener('change', function() {
-        const tarihInputs = document.getElementById('tarihInputs');
-        if (this.value === 'tarih') {
+    // Mod değişiminde ilgili alanları göster/gizle
+    const modeSelect = document.getElementById('modeSelect');
+    const donemInputs = document.getElementById('donemInputs');
+    const tarihInputs = document.getElementById('tarihInputs');
+    
+    function toggleInputs() {
+        if (!modeSelect) return;
+        donemInputs.style.display = 'none';
+        tarihInputs.style.display = 'none';
+        if (modeSelect.value === 'donem') {
+            donemInputs.style.display = '';
+        } else if (modeSelect.value === 'tarih') {
             tarihInputs.style.display = '';
-        } else {
-            tarihInputs.style.display = 'none';
         }
-    });
+    }
+    
+    if (modeSelect) {
+        modeSelect.addEventListener('change', toggleInputs);
+        toggleInputs();
+    }
 });
 </script>
 
@@ -271,7 +297,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($fazlaMesailer as $fm): ?>
+                                <?php 
+                                $toplamSaat = 0;
+                                $toplamTutar = 0;
+                                foreach ($fazlaMesailer as $fm): 
+                                    $toplamSaat += (float)$fm['saat'];
+                                    $toplamTutar += (float)$fm['tutar'];
+                                ?>
                                     <tr>
                                         <td><?php echo escape($fm['ad_soyad']); ?></td>
                                         <td><?php echo formatDate($fm['tarih']); ?></td>
@@ -290,6 +322,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
+                            <tfoot>
+                                <tr class="table-primary">
+                                    <th colspan="2" class="text-end">TOPLAM:</th>
+                                    <th><?php echo number_format($toplamSaat, 2, ',', '.'); ?></th>
+                                    <th></th>
+                                    <th class="money"><?php echo formatMoney($toplamTutar); ?></th>
+                                    <th colspan="2"></th>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 <?php endif; ?>
@@ -314,7 +355,17 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach($kumulatifToplamlar as $toplam): ?>
+                                <?php 
+                                $kumTopSaat = 0;
+                                $kumTopFM = 0;
+                                $kumTopOdeme = 0;
+                                $kumTopBakiye = 0;
+                                foreach($kumulatifToplamlar as $toplam): 
+                                    $kumTopSaat += (float)$toplam['toplam_saat'];
+                                    $kumTopFM += (float)$toplam['toplam_tutar'];
+                                    $kumTopOdeme += (float)$toplam['toplam_odeme'];
+                                    $kumTopBakiye += (float)$toplam['bakiye'];
+                                ?>
                                 <tr>
                                     <td><?php echo escape($toplam['ad_soyad']); ?></td>
                                     <td><?php echo number_format($toplam['toplam_saat'], 2); ?></td>
@@ -326,6 +377,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
+                            <tfoot>
+                                <tr class="table-primary">
+                                    <th>TOPLAM</th>
+                                    <th><?php echo number_format($kumTopSaat, 2, ',', '.'); ?></th>
+                                    <th class="money"><?php echo formatMoney($kumTopFM); ?></th>
+                                    <th class="money"><?php echo formatMoney($kumTopOdeme); ?></th>
+                                    <th class="money"><?php echo formatMoney($kumTopBakiye); ?></th>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 <?php endif; ?>
