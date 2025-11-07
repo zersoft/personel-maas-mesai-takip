@@ -24,8 +24,15 @@ $bitis = isset($_GET['bitis']) ? $_GET['bitis'] : date('Y-m-t');
 // Ekstre verileri
 $satirlar = [];
 $topBedel = 0.0; $topOdeme = 0.0; $bakiye = 0.0;
+$personelAdi = '';
 try {
     if ($seciliPersonel > 0) {
+        // Personel adını çek
+        $pStmt = $pdo->prepare("SELECT ad_soyad FROM personel_listesi WHERE id=?");
+        $pStmt->execute([$seciliPersonel]);
+        $pRow = $pStmt->fetch();
+        $personelAdi = $pRow ? $pRow['ad_soyad'] : '';
+        
         if ($mode === 'donem') {
             // Ay/Yıl bazlı
             $fmSql = "SELECT tarih AS t, 'FM' AS tur, saat, saat_ucreti, (saat * saat_ucreti) AS tutar, NULL AS aciklama
@@ -144,23 +151,44 @@ include '../includes/header.php';
             </div>
         </div>
 
-        <div class="row mt-3">
-            <div class="col-md-3">
-                <div class="form-control form-control-sm d-flex justify-content-between align-items-center">
-                    <span class="text-muted small">Toplam FM</span>
-                    <span class="fw-semibold"><?php echo formatMoney($topBedel); ?></span>
+        <!-- Ekstre Başlık Bilgileri (Yazdırma için) -->
+        <div class="mt-4 mb-3 p-3 bg-light border rounded">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="mb-2">Ekstre Bilgileri</h5>
+                    <p class="mb-1"><strong>Personel:</strong> <?php echo escape($personelAdi); ?></p>
+                    <p class="mb-1"><strong>Dönem:</strong> 
+                        <?php 
+                        if ($mode === 'donem') {
+                            echo getTurkishMonthName($ay) . ' ' . $yil;
+                        } else {
+                            echo date('d.m.Y', strtotime($baslangic)) . ' - ' . date('d.m.Y', strtotime($bitis));
+                        }
+                        ?>
+                    </p>
+                    <p class="mb-0"><small class="text-muted">Oluşturma: <?php echo date('d.m.Y H:i'); ?></small></p>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="form-control form-control-sm d-flex justify-content-between align-items-center">
-                    <span class="text-muted small">Ödeme</span>
-                    <span class="fw-semibold text-success"><?php echo formatMoney($topOdeme); ?></span>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="form-control form-control-sm d-flex justify-content-between align-items-center">
-                    <span class="text-muted small">Bakiye</span>
-                    <span class="fw-semibold text-primary"><?php echo formatMoney($bakiye); ?></span>
+                <div class="col-md-6">
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between p-2 bg-white border rounded">
+                                <span class="text-muted">Toplam FM:</span>
+                                <span class="fw-semibold"><?php echo formatMoney($topBedel); ?></span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between p-2 bg-white border rounded">
+                                <span class="text-muted">Ödeme:</span>
+                                <span class="fw-semibold text-success"><?php echo formatMoney($topOdeme); ?></span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between p-2 bg-primary text-white border rounded">
+                                <span class="fw-bold">Bakiye:</span>
+                                <span class="fw-bold"><?php echo formatMoney($bakiye); ?></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -194,6 +222,23 @@ include '../includes/header.php';
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
+                <tfoot>
+                    <tr class="table-primary">
+                        <th colspan="4" class="text-end">TOPLAM:</th>
+                        <th class="text-end"><?php echo formatMoney($topBedel); ?></th>
+                        <th></th>
+                    </tr>
+                    <tr class="table-success">
+                        <th colspan="4" class="text-end">ÖDEME:</th>
+                        <th class="text-end"><?php echo formatMoney($topOdeme); ?></th>
+                        <th></th>
+                    </tr>
+                    <tr class="table-info">
+                        <th colspan="4" class="text-end">BAKİYE:</th>
+                        <th class="text-end"><?php echo formatMoney($bakiye); ?></th>
+                        <th></th>
+                    </tr>
+                </tfoot>
             </table>
         </div>
         <?php endif; ?>
