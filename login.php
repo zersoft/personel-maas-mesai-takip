@@ -21,6 +21,14 @@ ini_set('session.use_only_cookies', 1);
 
 require_once 'config/db.php';
 
+// Versiyon bilgisini yükle
+$appConfigPath = __DIR__ . '/config/app.php';
+$appVersion = '2.0.0';
+if (file_exists($appConfigPath)) {
+    require_once $appConfigPath;
+    $appVersion = defined('APP_VERSION') ? APP_VERSION : '2.0.0';
+}
+
 // Zaten giriş yapmışsa ana sayfaya yönlendir
 if (isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -142,7 +150,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </form>
                 
                 <div class="text-center mt-4">
-                    <small class="text-muted">© 2025 ZERSOFT Personel Takip Sistemi</small>
+                    <small class="text-muted">
+                        © <?php echo date('Y'); ?> <a href="https://zersoft.net" target="_blank" class="text-decoration-none">ZERSOFT</a> Personel Takip Sistemi
+                        <span class="badge bg-secondary ms-2">v<?php echo $appVersion; ?></span>
+                    </small>
                 </div>
             </div>
         </div>
