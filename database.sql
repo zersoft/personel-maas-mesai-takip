@@ -124,6 +124,21 @@ CREATE INDEX idx_mesai_personel ON fazla_mesai(personel_id);
 CREATE INDEX idx_avans_personel ON avans_takip(personel_id);
 CREATE INDEX idx_tazminat_personel ON tazminat_takip(personel_id);
 
+-- 7. Puantaj (Günlük kayıtlar)
+CREATE TABLE IF NOT EXISTS puantaj (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    personel_id INT NOT NULL,
+    tarih DATE NOT NULL,
+    durum VARCHAR(20) NOT NULL DEFAULT 'Calisti', -- Calisti, Izin, Rapor, Devamsizlik, HTatil, RTatil
+    saat DECIMAL(5,2) NOT NULL DEFAULT 8.00,
+    aciklama VARCHAR(255) NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_puantaj_personel (personel_id),
+    INDEX idx_puantaj_tarih (tarih),
+    FOREIGN KEY (personel_id) REFERENCES personel_listesi(id) ON DELETE CASCADE
+);
+
 -- =====================================
 -- VERİTABANI OLUŞTURMA TAMAMLANDI ✅
 -- =====================================

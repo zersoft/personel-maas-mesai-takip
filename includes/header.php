@@ -51,6 +51,11 @@ $currentPage = basename($scriptPath);
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link <?php echo ($currentPage === 'puantaj.php') ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>puantaj.php">
+                            <i class="bi bi-clipboard-data"></i> Puantaj
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link <?php echo ($currentPage === 'fazla_mesai.php') ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>fazla_mesai.php">
                             <i class="bi bi-clock-history"></i> Fazla Mesai
                         </a>
