@@ -51,6 +51,12 @@ if (isset($_GET['error'])) {
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-clock-history"></i> Fazla Mesai Takibi</h1>
     <div class="d-flex gap-2">
+        <a href="fazla_mesai_raporu.php" class="btn btn-outline-secondary">
+            <i class="bi bi-list-check"></i> FM Raporu
+        </a>
+        <a href="fazla_mesai_ekstre.php" class="btn btn-outline-secondary">
+            <i class="bi bi-journal-text"></i> FM Ekstresi
+        </a>
         <a href="fazla_mesai_odeme_listesi.php" class="btn btn-outline-secondary">
             <i class="bi bi-receipt"></i> Ödeme Listesi
         </a>
@@ -58,6 +64,7 @@ if (isset($_GET['error'])) {
             <i class="bi bi-plus-circle"></i> Fazla Mesai Ekle
         </button>
     </div>
+    
 </div>
 
 <?php if (!empty($kumulatifToplamlar)): ?>

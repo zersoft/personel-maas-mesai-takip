@@ -56,9 +56,14 @@ if (isset($_GET['error'])) {
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-people"></i> Personel Listesi</h1>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personelEkleModal">
-        <i class="bi bi-person-plus"></i> Yeni Personel Ekle
-    </button>
+    <div class="d-flex gap-2">
+        <a href="personel_listesi.php?durum=silinmis" class="btn btn-outline-secondary">
+            <i class="bi bi-archive"></i> Silinen Personeller
+        </a>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personelEkleModal">
+            <i class="bi bi-person-plus"></i> Yeni Personel Ekle
+        </button>
+    </div>
 </div>
 
 <!-- Filtreleme Formu -->

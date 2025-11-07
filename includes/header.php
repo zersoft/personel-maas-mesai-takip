@@ -44,11 +44,7 @@ $currentPage = basename($scriptPath);
                             <i class="bi bi-people"></i> Personel Listesi
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link <?php echo ($currentPage === 'personel_listesi.php' && (isset($_GET['durum']) && $_GET['durum']==='silinmis')) ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>personel_listesi.php?durum=silinmis">
-                            <i class="bi bi-archive"></i> Silinen Personeller
-                        </a>
-                    </li>
+                    
                     <li class="nav-item">
                         <a class="nav-link <?php echo ($currentPage === 'bordro.php') ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>bordro.php">
                             <i class="bi bi-cash-coin"></i> Bordro
@@ -59,6 +55,7 @@ $currentPage = basename($scriptPath);
                             <i class="bi bi-clock-history"></i> Fazla Mesai
                         </a>
                     </li>
+                    
                     <li class="nav-item">
                         <a class="nav-link <?php echo ($currentPage === 'avans_takip.php') ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>avans_takip.php">
                             <i class="bi bi-wallet2"></i> Avans Takip

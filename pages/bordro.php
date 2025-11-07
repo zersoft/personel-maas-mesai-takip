@@ -2,20 +2,8 @@
 require_once '../config/db.php';
 require_once '../includes/functions.php';
 
-$pageTitle = 'Bordro Yönetimi';
 
-// Bordro listesi
-try {
-    $stmt = $pdo->query("SELECT b.*, p.ad_soyad,
-                                (b.brut_maas - b.sgk_banka) as nakit,
-                                (b.brut_maas + b.ek_odenek - COALESCE(b.izin_kesintisi, 0) - COALESCE(b.sgk_kesintisi, 0) - COALESCE(b.diger_kesintiler, 0)) as toplam_odenecek
-                         FROM bordro b 
-                         LEFT JOIN personel_listesi p ON b.personel_id = p.id 
-                         ORDER BY b.ay DESC, b.yil DESC");
-    $bordrolar = $stmt->fetchAll();
-} catch (PDOException $e) {
-    $bordrolar = [];
-}
+$pageTitle = 'Bordro Yönetimi';
 
 // Varsayılan dönem: son bordro (yoksa bugünün ay/yılı)
 $defaultAy = (int)date('n');
@@ -27,6 +15,26 @@ try {
         $defaultYil = (int)$son['yil'];
     }
 } catch (PDOException $e) {
+}
+
+// Seçili dönem: GET varsa onu kullan, yoksa varsayılanı
+$seciliAy = isset($_GET['ay']) && (int)$_GET['ay'] > 0 ? (int)$_GET['ay'] : $defaultAy;
+$seciliYil = isset($_GET['yil']) && (int)$_GET['yil'] > 0 ? (int)$_GET['yil'] : $defaultYil;
+
+// Bordro listesi (seçilen döneme göre filtreli)
+try {
+    $sql = "SELECT b.*, p.ad_soyad,
+                   (b.brut_maas - b.sgk_banka) as nakit,
+                   (b.brut_maas + b.ek_odenek - COALESCE(b.izin_kesintisi, 0) - COALESCE(b.sgk_kesintisi, 0) - COALESCE(b.diger_kesintiler, 0)) as toplam_odenecek
+            FROM bordro b
+            LEFT JOIN personel_listesi p ON b.personel_id = p.id
+            WHERE b.ay = ? AND b.yil = ?
+            ORDER BY b.yil DESC, b.ay DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$seciliAy, $seciliYil]);
+    $bordrolar = $stmt->fetchAll();
+} catch (PDOException $e) {
+    $bordrolar = [];
 }
 
 // Mini özet toplamları (banka/nakit/toplam) – avans ve ek ödenek kanal mantığıyla
@@ -46,7 +54,7 @@ try {
         GROUP BY personel_id
     ) a ON a.personel_id = b.personel_id
     WHERE b.ay = ? AND b.yil = ?");
-    $bankaToplamStmt->execute([$defaultAy, $defaultYil, $defaultAy, $defaultYil, $defaultAy, $defaultYil]);
+    $bankaToplamStmt->execute([$seciliAy, $seciliYil, $seciliAy, $seciliYil, $seciliAy, $seciliYil]);
     $miniBanka = (float)($bankaToplamStmt->fetch()['toplam'] ?? 0);
 
     // Nakit toplamı: nakit baz − kesinti − nakit avans + ek_odenek_nakit
@@ -62,7 +70,7 @@ try {
         GROUP BY personel_id
     ) a ON a.personel_id = b.personel_id
     WHERE b.ay = ? AND b.yil = ?");
-    $nakitToplamStmt->execute([$defaultAy, $defaultYil, $defaultAy, $defaultYil, $defaultAy, $defaultYil]);
+    $nakitToplamStmt->execute([$seciliAy, $seciliYil, $seciliAy, $seciliYil, $seciliAy, $seciliYil]);
     $miniNakit = (float)($nakitToplamStmt->fetch()['toplam'] ?? 0);
 
     // Genel toplam: Banka + Nakit (kanal bazlı ödemelerin toplamı)
@@ -101,7 +109,7 @@ if (isset($_GET['error'])) {
         <select class="form-select" id="ayFiltre">
             <option value="">Tüm Aylar</option>
             <?php for ($i = 1; $i <= 12; $i++): ?>
-                <option value="<?php echo $i; ?>" <?php echo ($i == $defaultAy) ? 'selected' : ''; ?>><?php echo getTurkishMonthName($i); ?></option>
+                <option value="<?php echo $i; ?>" <?php echo ($i == $seciliAy) ? 'selected' : ''; ?>><?php echo getTurkishMonthName($i); ?></option>
             <?php endfor; ?>
         </select>
     </div>
@@ -109,14 +117,14 @@ if (isset($_GET['error'])) {
         <select class="form-select" id="yilFiltre">
             <option value="">Tüm Yıllar</option>
             <?php for ($yil = date('Y'); $yil >= date('Y') - 5; $yil--): ?>
-                <option value="<?php echo $yil; ?>" <?php echo ($yil == $defaultYil) ? 'selected' : ''; ?>><?php echo $yil; ?></option>
+                <option value="<?php echo $yil; ?>" <?php echo ($yil == $seciliYil) ? 'selected' : ''; ?>><?php echo $yil; ?></option>
             <?php endfor; ?>
         </select>
     </div>
     <div class="col-md-2">  
         <div class="form-control form-control-sm d-flex justify-content-between align-items-center">
             <span class="text-muted small">Ödeme Özeti</span>
-            <span class="text-primary fw-semibold" id="miniOzetTxt"><?php echo getTurkishMonthName($defaultAy) . ' ' . $defaultYil; ?></span>
+            <span class="text-primary fw-semibold" id="miniOzetTxt"><?php echo getTurkishMonthName($seciliAy) . ' ' . $seciliYil; ?></span>
         </div>
     </div>
     <div class="col-md-2">
@@ -407,8 +415,8 @@ if (isset($_GET['error'])) {
 
         function guncelleMiniOzet() {
             if (!ayFiltre || !yilFiltre) return;
-            const ay = ayFiltre.value || '<?php echo $defaultAy; ?>';
-            const yil = yilFiltre.value || '<?php echo $defaultYil; ?>';
+            const ay = ayFiltre.value || '<?php echo $seciliAy; ?>';
+            const yil = yilFiltre.value || '<?php echo $seciliYil; ?>';
             fetch(`odeme_ozet_api.php?ay=${ay}&yil=${yil}`)
                 .then(r => r.json())
                 .then(d => {
@@ -432,8 +440,17 @@ if (isset($_GET['error'])) {
             const adlar = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
             return adlar[i] || i;
         }
-        if (ayFiltre) ayFiltre.addEventListener('change', guncelleMiniOzet);
-        if (yilFiltre) yilFiltre.addEventListener('change', guncelleMiniOzet);
+        function applyFiltreRedirect() {
+            if (!ayFiltre || !yilFiltre) return;
+            const params = new URLSearchParams();
+            if (ayFiltre.value) params.set('ay', ayFiltre.value);
+            if (yilFiltre.value) params.set('yil', yilFiltre.value);
+            const qs = params.toString();
+            window.location.href = 'bordro.php' + (qs ? ('?' + qs) : '');
+        }
+
+        if (ayFiltre) ayFiltre.addEventListener('change', applyFiltreRedirect);
+        if (yilFiltre) yilFiltre.addEventListener('change', applyFiltreRedirect);
         // İlk açılışta güncelle
         guncelleMiniOzet();
         const bordroModal = document.getElementById('bordroEkleModal');
