@@ -117,7 +117,7 @@ include '../includes/header.php';
                             <td><?php echo escape($r['aciklama']); ?></td>
                             <td class="no-print">
                                 <button class="btn btn-sm btn-warning" onclick="duzenle(<?php echo $r['id']; ?>)"><i class="bi bi-pencil"></i></button>
-                                <a class="btn btn-sm btn-danger" href="puantaj_islem.php?action=delete&id=<?php echo $r['id']; }?>" onclick="return confirm('Silinsin mi?')"><i class="bi bi-trash"></i></a>
+                                <a class="btn btn-sm btn-danger" href="puantaj_islem.php?action=delete&id=<?php echo $r['id']; ?>" onclick="return confirm('Silinsin mi?')"><i class="bi bi-trash"></i></a>
                             </td>
                         </tr>
                     <?php endforeach; endif; ?>

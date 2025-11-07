@@ -60,9 +60,9 @@ if (isset($_GET['error'])) {
         <a href="personel_listesi.php?durum=silinmis" class="btn btn-outline-secondary">
             <i class="bi bi-archive"></i> Silinen Personeller
         </a>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personelEkleModal">
-            <i class="bi bi-person-plus"></i> Yeni Personel Ekle
-        </button>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personelEkleModal">
+        <i class="bi bi-person-plus"></i> Yeni Personel Ekle
+    </button>
     </div>
 </div>
 
