@@ -7,6 +7,7 @@ $pageTitle = 'Avans Takibi';
 // Bordro dönemi filtresi (Ay/Yıl)
 $ay = isset($_GET['ay']) ? (int)$_GET['ay'] : (int)date('n');
 $yil = isset($_GET['yil']) ? (int)$_GET['yil'] : (int)date('Y');
+$personel_filtre = isset($_GET['personel_id']) ? (int)$_GET['personel_id'] : 0;
 if ($ay < 1 || $ay > 12) { $ay = (int)date('n'); }
 if ($yil < 2000 || $yil > 2100) { $yil = (int)date('Y'); }
 
@@ -15,10 +16,17 @@ try {
     $sql = "SELECT a.*, p.ad_soyad
             FROM avans_takip a
             LEFT JOIN personel_listesi p ON a.personel_id = p.id
-            WHERE ( (a.bordro_ay = ? AND a.bordro_yil = ?) OR (a.bordro_ay IS NULL AND a.bordro_yil IS NULL AND MONTH(a.tarih) = ? AND YEAR(a.tarih) = ?) )
-            ORDER BY a.tarih DESC";
+            WHERE ( (a.bordro_ay = ? AND a.bordro_yil = ?) OR (a.bordro_ay IS NULL AND a.bordro_yil IS NULL AND MONTH(a.tarih) = ? AND YEAR(a.tarih) = ?) )";
+    $params = [$ay, $yil, $ay, $yil];
+    
+    if ($personel_filtre > 0) {
+        $sql .= " AND a.personel_id = ?";
+        $params[] = $personel_filtre;
+    }
+    
+    $sql .= " ORDER BY a.tarih DESC";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$ay, $yil, $ay, $yil]);
+    $stmt->execute($params);
     $avanslar = $stmt->fetchAll();
 } catch(PDOException $e) {
     $avanslar = [];
@@ -27,19 +35,27 @@ try {
 include '../includes/header.php';
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="bi bi-wallet2"></i> Avans Takibi</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-wallet2"></i> Avans Takibi</h3>
     <div class="d-flex align-items-center gap-2">
         <form method="GET" class="d-flex align-items-center gap-2">
-            <select class="form-select form-select-sm" name="ay" style="max-width: 150px;">
+            <input type="hidden" name="personel_id" value="<?php echo $personel_filtre; ?>">
+            <select class="form-select form-select-sm" name="ay" style="width: 120px;">
                 <?php for($i=1; $i<=12; $i++): ?>
                     <option value="<?php echo $i; ?>" <?php echo ($i==$ay)?'selected':''; ?>><?php echo getTurkishMonthName($i); ?></option>
                 <?php endfor; ?>
             </select>
-            <input type="number" class="form-control form-control-sm" name="yil" value="<?php echo $yil; ?>" min="2020" max="<?php echo date('Y')+1; ?>" style="max-width: 100px;">
-            <button class="btn btn-sm btn-outline-primary" type="submit">Filtrele</button>
+            <input type="number" class="form-control form-control-sm" name="yil" value="<?php echo $yil; ?>" min="2020" max="<?php echo date('Y')+1; ?>" style="width: 90px;">
+            <button class="btn btn-sm btn-outline-primary" type="submit">
+                <i class="bi bi-funnel"></i> Filtrele
+            </button>
+            <?php if ($personel_filtre > 0): ?>
+                <a href="avans_takip.php?ay=<?php echo $ay; ?>&yil=<?php echo $yil; ?>" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Temizle
+                </a>
+            <?php endif; ?>
         </form>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#avansEkleModal">
+        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#avansEkleModal">
             <i class="bi bi-plus-circle"></i> Avans Ekle
         </button>
     </div>

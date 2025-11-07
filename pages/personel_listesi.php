@@ -182,6 +182,19 @@ if (isset($_GET['error'])) {
                                         <div class="btn-group btn-group-sm" role="group">
                                             <button class="btn btn-warning" title="Düzenle" onclick="duzenlePersonel(<?php echo $personel['id']; ?>)"><i class="bi bi-pencil"></i></button>
                                             <button class="btn btn-danger" title="Sil" onclick="silPersonel(<?php echo $personel['id']; ?>)"><i class="bi bi-trash"></i></button>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <button type="button" class="btn btn-info dropdown-toggle" data-bs-toggle="dropdown" title="Kayıtlar">
+                                                    <i class="bi bi-three-dots"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end">
+                                                    <li><a class="dropdown-item" href="bordro.php?personel_id=<?php echo $personel['id']; ?>"><i class="bi bi-cash-coin"></i> Bordro Kayıtları</a></li>
+                                                    <li><a class="dropdown-item" href="puantaj_ekstre.php?personel_id=<?php echo $personel['id']; ?>&mode=donem"><i class="bi bi-clipboard-data"></i> Puantaj Kayıtları</a></li>
+                                                    <li><a class="dropdown-item" href="fazla_mesai.php?personel_id=<?php echo $personel['id']; ?>&mode=bu_ay"><i class="bi bi-clock-history"></i> Fazla Mesai Kayıtları</a></li>
+                                                    <li><a class="dropdown-item" href="avans_takip.php?personel_id=<?php echo $personel['id']; ?>"><i class="bi bi-wallet2"></i> Avans Kayıtları</a></li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item" href="fazla_mesai_ekstre.php?personel_id=<?php echo $personel['id']; ?>&mode=donem"><i class="bi bi-receipt"></i> FM Ekstresi</a></li>
+                                                </ul>
+                                            </div>
                                         </div>
                                     <?php else: ?>
                                         <div class="btn-group btn-group-sm" role="group">

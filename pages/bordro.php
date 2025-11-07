@@ -20,6 +20,7 @@ try {
 // Seçili dönem: GET varsa onu kullan, yoksa varsayılanı
 $seciliAy = isset($_GET['ay']) && (int)$_GET['ay'] > 0 ? (int)$_GET['ay'] : $defaultAy;
 $seciliYil = isset($_GET['yil']) && (int)$_GET['yil'] > 0 ? (int)$_GET['yil'] : $defaultYil;
+$personel_filtre = isset($_GET['personel_id']) ? (int)$_GET['personel_id'] : 0;
 
 // Bordro listesi (seçilen döneme göre filtreli)
 try {
@@ -28,10 +29,17 @@ try {
                    (b.brut_maas + b.ek_odenek - COALESCE(b.izin_kesintisi, 0) - COALESCE(b.sgk_kesintisi, 0) - COALESCE(b.diger_kesintiler, 0)) as toplam_odenecek
             FROM bordro b
             LEFT JOIN personel_listesi p ON b.personel_id = p.id
-            WHERE b.ay = ? AND b.yil = ?
-            ORDER BY b.yil DESC, b.ay DESC";
+            WHERE b.ay = ? AND b.yil = ?";
+    $params = [$seciliAy, $seciliYil];
+    
+    if ($personel_filtre > 0) {
+        $sql .= " AND b.personel_id = ?";
+        $params[] = $personel_filtre;
+    }
+    
+    $sql .= " ORDER BY b.yil DESC, b.ay DESC";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$seciliAy, $seciliYil]);
+    $stmt->execute($params);
     $bordrolar = $stmt->fetchAll();
 } catch (PDOException $e) {
     $bordrolar = [];
