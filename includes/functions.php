@@ -18,6 +18,16 @@ function formatDate($date, $format = 'd.m.Y') {
 }
 
 /**
+ * Tarih formatı (gün adı ile)
+ */
+function formatDateWithDay($date) {
+    $gunler = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+    $timestamp = strtotime($date);
+    $gun = $gunler[date('w', $timestamp)];
+    return date('d.m.Y', $timestamp) . ' <span class="text-muted small">' . $gun . '</span>';
+}
+
+/**
  * Para formatı
  */
 function formatMoney($amount) {

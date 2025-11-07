@@ -306,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 ?>
                                     <tr>
                                         <td><?php echo escape($fm['ad_soyad']); ?></td>
-                                        <td><?php echo formatDate($fm['tarih']); ?></td>
+                                        <td><?php echo formatDateWithDay($fm['tarih']); ?></td>
                                         <td><?php echo escape($fm['saat']); ?></td>
                                         <td class="money"><?php echo formatMoney($fm['saat_ucreti']); ?></td>
                                         <td class="money"><?php echo formatMoney($fm['tutar']); ?></td>
