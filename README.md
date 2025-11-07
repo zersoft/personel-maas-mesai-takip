@@ -274,5 +274,5 @@ Bu proje özel kullanım için geliştirilmiştir.
 
 ---
 
-**Son Güncelleme**: 2024
+**Son Güncelleme**: 2025
 **Versiyon**: 1.0.0
