@@ -42,7 +42,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
         $stmt = $pdo->prepare("DELETE FROM fazla_mesai WHERE id = ?");
         $stmt->execute([$id]);
         if (ob_get_level() > 0) { @ob_end_clean(); }
-        safeRedirect('fazla_mesai.php?success=1');
+        // Filtre parametrelerini koru (referer'dan)
+        $returnParams = '';
+        if (isset($_SERVER['HTTP_REFERER'])) {
+            $referer = parse_url($_SERVER['HTTP_REFERER'], PHP_URL_QUERY);
+            if ($referer) {
+                parse_str($referer, $params);
+                unset($params['id'], $params['success'], $params['error']);
+                if (!empty($params)) $returnParams = '&' . http_build_query($params);
+            }
+        }
+        safeRedirect('fazla_mesai.php?success=1' . $returnParams);
     } catch(PDOException $e) {
         if (ob_get_level() > 0) { @ob_end_clean(); }
         safeRedirect('fazla_mesai.php?error=' . urlencode($e->getMessage()));
@@ -93,7 +103,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         ]);
 
         if (ob_get_level() > 0) { @ob_end_clean(); }
-        safeRedirect('fazla_mesai.php?success=1');
+        // Filtre parametrelerini koru
+        $returnParams = isset($_POST['return_params']) ? $_POST['return_params'] : '';
+        safeRedirect('fazla_mesai.php?success=1' . ($returnParams ? '&' . $returnParams : ''));
     } catch(PDOException $e) {
         if (ob_get_level() > 0) { @ob_end_clean(); }
         safeRedirect('fazla_mesai_duzenle.php?id=' . ($id ?? '') . '&error=' . urlencode($e->getMessage()));

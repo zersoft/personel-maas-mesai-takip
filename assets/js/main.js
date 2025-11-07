@@ -34,7 +34,18 @@ function silBordro(id) {
 
 // Fazla mesai işlemleri
 function duzenleFazlaMesai(id) {
-    window.location.href = 'fazla_mesai_duzenle.php?id=' + id;
+    // Mevcut URL parametrelerini koru
+    const currentParams = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams();
+    params.set('id', id);
+    // Filtre parametrelerini taşı
+    if (currentParams.has('mode')) params.set('mode', currentParams.get('mode'));
+    if (currentParams.has('personel_id')) params.set('personel_id', currentParams.get('personel_id'));
+    if (currentParams.has('ay')) params.set('ay', currentParams.get('ay'));
+    if (currentParams.has('yil')) params.set('yil', currentParams.get('yil'));
+    if (currentParams.has('baslangic')) params.set('baslangic', currentParams.get('baslangic'));
+    if (currentParams.has('bitis')) params.set('bitis', currentParams.get('bitis'));
+    window.location.href = 'fazla_mesai_duzenle.php?' + params.toString();
 }
 
 function silFazlaMesai(id) {

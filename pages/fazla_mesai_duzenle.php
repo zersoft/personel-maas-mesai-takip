@@ -5,6 +5,15 @@ require_once '../includes/functions.php';
 $pageTitle = 'Fazla Mesai Düzenle';
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null; // SQL injection koruması için integer cast
+// Geri dönüş için filtre parametrelerini sakla
+$returnParams = [];
+if (isset($_GET['mode'])) $returnParams['mode'] = $_GET['mode'];
+if (isset($_GET['personel_id'])) $returnParams['personel_id'] = $_GET['personel_id'];
+if (isset($_GET['ay'])) $returnParams['ay'] = $_GET['ay'];
+if (isset($_GET['yil'])) $returnParams['yil'] = $_GET['yil'];
+if (isset($_GET['baslangic'])) $returnParams['baslangic'] = $_GET['baslangic'];
+if (isset($_GET['bitis'])) $returnParams['bitis'] = $_GET['bitis'];
+$returnQuery = !empty($returnParams) ? '&' . http_build_query($returnParams) : '';
 
 if (!$id || $id <= 0) {
     header('Location: fazla_mesai.php?error=Geçersiz fazla mesai ID');
@@ -41,7 +50,7 @@ if (isset($_GET['error'])) {
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-pencil-square"></i> Fazla Mesai Düzenle</h1>
-    <a href="fazla_mesai.php" class="btn btn-secondary">
+    <a href="fazla_mesai.php?<?php echo http_build_query($returnParams); ?>" class="btn btn-secondary">
         <i class="bi bi-arrow-left"></i> Geri Dön
     </a>
 </div>
@@ -51,6 +60,7 @@ if (isset($_GET['error'])) {
         <form action="fazla_mesai_islem.php" method="POST">
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" value="<?php echo $fazlaMesai['id']; ?>">
+            <input type="hidden" name="return_params" value="<?php echo htmlspecialchars(http_build_query($returnParams)); ?>">
             
             <div class="row g-3">
                 <div class="col-md-6">
@@ -96,7 +106,7 @@ if (isset($_GET['error'])) {
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-save"></i> Güncelle
                 </button>
-                <a href="fazla_mesai.php" class="btn btn-secondary">İptal</a>
+                <a href="fazla_mesai.php?<?php echo http_build_query($returnParams); ?>" class="btn btn-secondary">İptal</a>
             </div>
         </form>
     </div>
