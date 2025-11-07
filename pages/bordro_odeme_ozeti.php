@@ -36,7 +36,10 @@ include '../includes/header.php';
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-receipt"></i> Bordro Ödeme Özeti</h1>
-    <div class="no-print">
+    <div class="no-print d-flex gap-2">
+        <a href="bordro.php?ay=<?php echo $ay; ?>&yil=<?php echo $yil; ?>" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> Bordroya Dön
+        </a>
         <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
             <i class="bi bi-printer"></i> PDF / Yazdır
         </button>

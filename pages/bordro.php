@@ -95,6 +95,9 @@ if (isset($_GET['error'])) {
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-cash-coin"></i> Bordro Yönetimi</h1>
     <div class="d-flex align-items-center gap-2">
+        <a href="bordro_odeme_ozeti.php?ay=<?php echo $seciliAy; ?>&yil=<?php echo $seciliYil; ?>" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-receipt"></i> Ödeme Özeti
+        </a>
         <a href="toplu_bordro.php" class="btn btn-success me-2">
             <i class="bi bi-file-earmark-spreadsheet"></i> Toplu Bordro Oluştur
         </a>
@@ -102,6 +105,7 @@ if (isset($_GET['error'])) {
             <i class="bi bi-plus-circle"></i> Yeni Bordro Oluştur
         </button>
     </div>
+    
 </div>
 
 <div class="row mb-3">

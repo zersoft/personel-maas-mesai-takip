@@ -72,9 +72,14 @@ include '../includes/header.php';
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1><i class="bi bi-receipt"></i> Fazla Mesai Ekstresi</h1>
-    <button class="btn btn-outline-secondary" onclick="window.print()">
-        <i class="bi bi-printer"></i> PDF / Yazdır
-    </button>
+    <div class="d-flex gap-2">
+        <a href="fazla_mesai.php" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> Fazla Mesai'ye Dön
+        </a>
+        <button class="btn btn-outline-secondary" onclick="window.print()">
+            <i class="bi bi-printer"></i> PDF / Yazdır
+        </button>
+    </div>
     <style>
         @media print {
             nav, .navbar, .btn, .form-select, .form-control, .filter-row { display: none !important; }
