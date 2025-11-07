@@ -32,6 +32,48 @@ function parseMoneyLocal($value) {
 }
 
 try {
+    if (isset($_POST['action']) && $_POST['action'] === 'single_payment') {
+        // Tek ödeme
+        $personel_id = (int)($_POST['personel_id'] ?? 0);
+        $odeme_tarihi = $_POST['odeme_tarihi'] ?? date('Y-m-d');
+        $tutar = isset($_POST['tutar']) ? parseMoneyLocal($_POST['tutar']) : 0;
+        $aciklama = $_POST['aciklama'] ?? null;
+        
+        if ($personel_id <= 0 || $tutar <= 0) {
+            throw new Exception('Geçersiz veri');
+        }
+        
+        $stmt = $pdo->prepare('INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama) VALUES (?,?,?,?)');
+        $stmt->execute([$personel_id, $odeme_tarihi, $tutar, $aciklama]);
+        
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai.php?success=1');
+    }
+    
+    if (isset($_POST['action']) && $_POST['action'] === 'bulk_payment') {
+        // Toplu ödeme
+        $odeme_tarihi = $_POST['odeme_tarihi'] ?? date('Y-m-d');
+        $personel = $_POST['personel'] ?? [];
+        
+        if (empty($personel)) {
+            throw new Exception('Personel seçilmedi');
+        }
+        
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare('INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama) VALUES (?,?,?,?)');
+        
+        foreach ($personel as $pid => $data) {
+            if (!isset($data['secili'])) continue;
+            $tutar = isset($data['tutar']) ? parseMoneyLocal($data['tutar']) : 0;
+            if ($tutar <= 0) continue;
+            $stmt->execute([$pid, $odeme_tarihi, $tutar, 'Toplu ödeme']);
+        }
+        
+        $pdo->commit();
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai.php?success=1');
+    }
+    
     if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
         $id = (int)$_GET['id'];
         if ($id <= 0) {

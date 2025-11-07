@@ -63,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $saat_ucreti = isset($_POST['saat_ucreti_raw'])
             ? parseMoneyLocal($_POST['saat_ucreti_raw'])
             : parseMoneyLocal($_POST['saat_ucreti'] ?? 0);
-        $odendi = isset($_POST['odendi']) ? 1 : 0;
         $aciklama = $_POST['aciklama'] ?? null;
 
         if (!$personel_id || !$tarih) {
@@ -80,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         $stmt = $pdo->prepare("
             UPDATE fazla_mesai SET
-                personel_id = ?, tarih = ?, saat = ?, saat_ucreti = ?, odendi = ?, aciklama = ?
+                personel_id = ?, tarih = ?, saat = ?, saat_ucreti = ?, aciklama = ?
             WHERE id = ?
         ");
 
@@ -89,7 +88,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $tarih,
             $saat,
             $saat_ucreti,
-            $odendi,
             $aciklama ?: null,
             $id
         ]);
@@ -113,7 +111,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $saat_ucreti = isset($_POST['saat_ucreti_raw'])
             ? parseMoneyLocal($_POST['saat_ucreti_raw'])
             : parseMoneyLocal($_POST['saat_ucreti'] ?? 0);
-        $odendi = isset($_POST['odendi']) ? 1 : 0;
         $aciklama = $_POST['aciklama'] ?? null;
 
         if (!$personel_id || !$tarih) {
@@ -130,8 +127,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt = $pdo->prepare("
             INSERT INTO fazla_mesai 
-            (personel_id, tarih, saat, saat_ucreti, odendi, aciklama) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            (personel_id, tarih, saat, saat_ucreti, aciklama) 
+            VALUES (?, ?, ?, ?, ?)
         ");
 
         $stmt->execute([
@@ -139,7 +136,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tarih,
             $saat,
             $saat_ucreti,
-            $odendi,
             $aciklama ?: null
         ]);
 

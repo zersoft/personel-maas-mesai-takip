@@ -4,21 +4,33 @@ require_once '../includes/functions.php';
 
 $pageTitle = 'Fazla Mesai Ödeme Listesi';
 
-// Filtreler (opsiyonel)
+// Filtreler
 $personel_id = isset($_GET['personel_id']) ? (int)$_GET['personel_id'] : 0;
+$baslangic = isset($_GET['baslangic']) ? $_GET['baslangic'] : '';
+$bitis = isset($_GET['bitis']) ? $_GET['bitis'] : '';
 
 try {
+    $sql = "SELECT o.*, p.ad_soyad FROM fazla_mesai_odeme o
+            LEFT JOIN personel_listesi p ON o.personel_id = p.id
+            WHERE 1=1";
+    $params = [];
+    
     if ($personel_id > 0) {
-        $stmt = $pdo->prepare("SELECT o.*, p.ad_soyad FROM fazla_mesai_odeme o
-                               LEFT JOIN personel_listesi p ON o.personel_id = p.id
-                               WHERE o.personel_id = ?
-                               ORDER BY o.odeme_zamani DESC");
-        $stmt->execute([$personel_id]);
-    } else {
-        $stmt = $pdo->query("SELECT o.*, p.ad_soyad FROM fazla_mesai_odeme o
-                              LEFT JOIN personel_listesi p ON o.personel_id = p.id
-                              ORDER BY o.odeme_zamani DESC");
+        $sql .= " AND o.personel_id = ?";
+        $params[] = $personel_id;
     }
+    if ($baslangic) {
+        $sql .= " AND o.odeme_tarihi >= ?";
+        $params[] = $baslangic;
+    }
+    if ($bitis) {
+        $sql .= " AND o.odeme_tarihi <= ?";
+        $params[] = $bitis;
+    }
+    
+    $sql .= " ORDER BY o.odeme_zamani DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     $odemeler = $stmt->fetchAll();
 
     $personeller = $pdo->query("SELECT id, ad_soyad FROM personel_listesi WHERE aktif = 1 ORDER BY ad_soyad")->fetchAll();
@@ -47,7 +59,7 @@ if (isset($_GET['error'])) {
 <div class="card mb-3">
     <div class="card-body">
         <form method="GET" class="row g-2">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">Personel</label>
                 <select class="form-select" name="personel_id">
                     <option value="0">Tümü</option>
@@ -58,8 +70,19 @@ if (isset($_GET['error'])) {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-md-2 align-self-end">
-                <button type="submit" class="btn btn-outline-primary">Filtrele</button>
+            <div class="col-md-3">
+                <label class="form-label">Başlangıç Tarihi</label>
+                <input type="date" class="form-control" name="baslangic" value="<?php echo escape($baslangic); ?>">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Bitiş Tarihi</label>
+                <input type="date" class="form-control" name="bitis" value="<?php echo escape($bitis); ?>">
+            </div>
+            <div class="col-md-3 align-self-end">
+                <button type="submit" class="btn btn-primary">Filtrele</button>
+                <?php if ($personel_id || $baslangic || $bitis): ?>
+                    <a href="fazla_mesai_odeme_listesi.php" class="btn btn-outline-secondary">Temizle</a>
+                <?php endif; ?>
             </div>
         </form>
     </div>
@@ -85,7 +108,11 @@ if (isset($_GET['error'])) {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach($odemeler as $o): ?>
+                        <?php 
+                        $toplamTutar = 0;
+                        foreach($odemeler as $o): 
+                            $toplamTutar += (float)$o['tutar'];
+                        ?>
                             <tr>
                                 <td><?php echo escape($o['ad_soyad'] ?? ''); ?></td>
                                 <td><?php echo formatDate($o['odeme_tarihi']); ?></td>
@@ -103,6 +130,13 @@ if (isset($_GET['error'])) {
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
+                    <tfoot>
+                        <tr class="table-primary">
+                            <th colspan="2" class="text-end">TOPLAM:</th>
+                            <th class="money"><?php echo formatMoney($toplamTutar); ?></th>
+                            <th colspan="3"></th>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         <?php endif; ?>

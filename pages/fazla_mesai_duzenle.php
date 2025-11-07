@@ -86,14 +86,6 @@ if (isset($_GET['error'])) {
                     </div>
                 </div>
                 
-                <div class="col-md-4">
-                    <label class="form-label d-block">&nbsp;</label>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="odendi" value="1" id="odendi" <?php echo $fazlaMesai['odendi'] ? 'checked' : ''; ?>>
-                        <label class="form-check-label" for="odendi">Ödendi</label>
-                    </div>
-                </div>
-                
                 <div class="col-12">
                     <label class="form-label">Açıklama</label>
                     <textarea class="form-control" name="aciklama" rows="2"><?php echo escape($fazlaMesai['aciklama'] ?? ''); ?></textarea>
