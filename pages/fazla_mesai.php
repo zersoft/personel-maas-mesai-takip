@@ -8,60 +8,22 @@ $pageTitle = 'Fazla Mesai Takibi';
 $mode = isset($_GET['mode']) ? $_GET['mode'] : 'bugun';
 $baslangic = isset($_GET['baslangic']) ? $_GET['baslangic'] : date('Y-m-d');
 $bitis = isset($_GET['bitis']) ? $_GET['bitis'] : date('Y-m-d');
+$personel_filtre = isset($_GET['personel_id']) ? (int)$_GET['personel_id'] : 0;
 
-// Personel bazlı kümülatif toplamlar (filtreden bağımsız, tüm kayıtlar)
+// Filtrelenmiş FM listesi ve kümülatif toplamlar
 try {
-    // Tüm FM kayıtlarını çek (filtre olmadan)
-    $tumFMStmt = $pdo->query("SELECT fm.*, p.ad_soyad 
-                              FROM fazla_mesai fm 
-                              LEFT JOIN personel_listesi p ON fm.personel_id = p.id");
-    $tumFM = $tumFMStmt->fetchAll();
-    $kumulatifToplamlar = [];
-    
-    // Tüm aktif personelleri al
-    $personelStmt = $pdo->query("SELECT id, ad_soyad FROM personel_listesi WHERE aktif = 1 ORDER BY ad_soyad");
-    $tumPersoneller = $personelStmt->fetchAll();
-    
-    // Her personel için başlangıç değerleri
-    foreach($tumPersoneller as $p) {
-        $kumulatifToplamlar[$p['id']] = [
-            'ad_soyad' => $p['ad_soyad'],
-            'toplam_saat' => 0,
-            'toplam_tutar' => 0,
-            'toplam_odeme' => 0,
-            'bakiye' => 0
-        ];
-    }
-    
-    // FM toplamlarını hesapla (tüm kayıtlardan)
-    foreach($tumFM as $fm) {
-        $personelId = $fm['personel_id'];
-        if (isset($kumulatifToplamlar[$personelId])) {
-            $kumulatifToplamlar[$personelId]['toplam_saat'] += $fm['saat'];
-            $kumulatifToplamlar[$personelId]['toplam_tutar'] += $fm['tutar'];
-        }
-    }
-    
-    // Ödemeleri çek ve toplamlardan düş
-    $odemeStmt = $pdo->query("SELECT personel_id, SUM(tutar) as toplam_odeme FROM fazla_mesai_odeme GROUP BY personel_id");
-    $odemeler = $odemeStmt->fetchAll(PDO::FETCH_KEY_PAIR);
-    
-    foreach($kumulatifToplamlar as $pid => &$toplam) {
-        $toplam['toplam_odeme'] = isset($odemeler[$pid]) ? (float)$odemeler[$pid] : 0;
-        $toplam['bakiye'] = $toplam['toplam_tutar'] - $toplam['toplam_odeme'];
-    }
-    
-    // Sadece FM'si veya ödemesi olan personelleri göster
-    $kumulatifToplamlar = array_filter($kumulatifToplamlar, function($t) {
-        return $t['toplam_tutar'] > 0 || $t['toplam_odeme'] > 0;
-    });
-    
-    // Filtrelenmiş FM listesi (gösterim için)
+    // Filtre parametrelerini hazırla
     $sqlFiltre = "SELECT fm.*, p.ad_soyad 
                   FROM fazla_mesai fm 
                   LEFT JOIN personel_listesi p ON fm.personel_id = p.id 
                   WHERE 1=1";
     $paramsFiltre = [];
+    
+    // Personel filtresi
+    if ($personel_filtre > 0) {
+        $sqlFiltre .= " AND fm.personel_id = ?";
+        $paramsFiltre[] = $personel_filtre;
+    }
     
     if ($mode === 'bugun') {
         $sqlFiltre .= " AND fm.tarih = ?";
@@ -85,6 +47,76 @@ try {
     $stmtFiltre = $pdo->prepare($sqlFiltre);
     $stmtFiltre->execute($paramsFiltre);
     $fazlaMesailer = $stmtFiltre->fetchAll();
+    
+    // Kümülatif toplamlar (filtrelenmiş kayıtlardan)
+    $kumulatifToplamlar = [];
+    
+    // Tüm aktif personelleri al
+    $personelStmt = $pdo->query("SELECT id, ad_soyad FROM personel_listesi WHERE aktif = 1 ORDER BY ad_soyad");
+    $tumPersoneller = $personelStmt->fetchAll();
+    
+    // Her personel için başlangıç değerleri
+    foreach($tumPersoneller as $p) {
+        $kumulatifToplamlar[$p['id']] = [
+            'ad_soyad' => $p['ad_soyad'],
+            'toplam_saat' => 0,
+            'toplam_tutar' => 0,
+            'toplam_odeme' => 0,
+            'bakiye' => 0
+        ];
+    }
+    
+    // FM toplamlarını hesapla (filtrelenmiş kayıtlardan)
+    foreach($fazlaMesailer as $fm) {
+        $personelId = $fm['personel_id'];
+        if (isset($kumulatifToplamlar[$personelId])) {
+            $kumulatifToplamlar[$personelId]['toplam_saat'] += $fm['saat'];
+            $kumulatifToplamlar[$personelId]['toplam_tutar'] += $fm['tutar'];
+        }
+    }
+    
+    // Ödemeleri çek (filtre ile aynı dönemden)
+    $sqlOdeme = "SELECT personel_id, SUM(tutar) as toplam_odeme FROM fazla_mesai_odeme WHERE 1=1";
+    $paramsOdeme = [];
+    
+    // Personel filtresi
+    if ($personel_filtre > 0) {
+        $sqlOdeme .= " AND personel_id = ?";
+        $paramsOdeme[] = $personel_filtre;
+    }
+    
+    if ($mode === 'bugun') {
+        $sqlOdeme .= " AND odeme_tarihi = ?";
+        $paramsOdeme[] = date('Y-m-d');
+    } elseif ($mode === 'bu_hafta') {
+        $pazartesi = date('Y-m-d', strtotime('monday this week'));
+        $sqlOdeme .= " AND odeme_tarihi BETWEEN ? AND ?";
+        $paramsOdeme[] = $pazartesi;
+        $paramsOdeme[] = date('Y-m-d');
+    } elseif ($mode === 'bu_ay') {
+        $sqlOdeme .= " AND MONTH(odeme_tarihi) = ? AND YEAR(odeme_tarihi) = ?";
+        $paramsOdeme[] = (int)date('n');
+        $paramsOdeme[] = (int)date('Y');
+    } elseif ($mode === 'tarih') {
+        $sqlOdeme .= " AND odeme_tarihi BETWEEN ? AND ?";
+        $paramsOdeme[] = $baslangic;
+        $paramsOdeme[] = $bitis;
+    }
+    
+    $sqlOdeme .= " GROUP BY personel_id";
+    $odemeStmt = $pdo->prepare($sqlOdeme);
+    $odemeStmt->execute($paramsOdeme);
+    $odemeler = $odemeStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    
+    foreach($kumulatifToplamlar as $pid => &$toplam) {
+        $toplam['toplam_odeme'] = isset($odemeler[$pid]) ? (float)$odemeler[$pid] : 0;
+        $toplam['bakiye'] = $toplam['toplam_tutar'] - $toplam['toplam_odeme'];
+    }
+    
+    // Sadece FM'si veya ödemesi olan personelleri göster
+    $kumulatifToplamlar = array_filter($kumulatifToplamlar, function($t) {
+        return $t['toplam_tutar'] > 0 || $t['toplam_odeme'] > 0;
+    });
 } catch(PDOException $e) {
     $fazlaMesailer = [];
     $kumulatifToplamlar = [];
@@ -101,71 +133,52 @@ if (isset($_GET['error'])) {
 }
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="bi bi-clock-history"></i> Fazla Mesai Takibi</h1>
-    <div class="d-flex gap-2">
-        <a href="fazla_mesai_raporu.php" class="btn btn-outline-secondary">
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-clock-history"></i> Fazla Mesai Takibi</h3>
+    <div class="d-flex gap-1">
+        <a href="fazla_mesai_raporu.php" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-list-check"></i> FM Raporu
         </a>
-        <a href="fazla_mesai_ekstre.php" class="btn btn-outline-secondary">
+        <a href="fazla_mesai_ekstre.php" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-journal-text"></i> FM Ekstresi
         </a>
-        <a href="fazla_mesai_odeme_listesi.php" class="btn btn-outline-secondary">
+        <a href="fazla_mesai_odeme_listesi.php" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-receipt"></i> Ödeme Listesi
         </a>
-        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#odemeYapModal">
+        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#odemeYapModal">
             <i class="bi bi-cash-coin"></i> Ödeme Yap
         </button>
-        <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#topluOdemeModal">
+        <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#topluOdemeModal">
             <i class="bi bi-cash-stack"></i> Toplu Ödeme
         </button>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#fazlaMesaiEkleModal">
-            <i class="bi bi-plus-circle"></i> Fazla Mesai Ekle
+        <a href="toplu_fazla_mesai.php" class="btn btn-sm btn-warning">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Toplu FM
+        </a>
+        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#fazlaMesaiEkleModal">
+            <i class="bi bi-plus-circle"></i> FM Ekle
         </button>
     </div>
-    
 </div>
-
-<?php if (!empty($kumulatifToplamlar)): ?>
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-calculator"></i> Personel Bazlı Kümülatif Toplamlar</h5>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-                <thead>
-                    <tr>
-                        <th>Personel</th>
-                        <th>Toplam Saat</th>
-                        <th class="money">Toplam FM</th>
-                        <th class="money">Toplam Ödeme</th>
-                        <th class="money">Bakiye</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach($kumulatifToplamlar as $toplam): ?>
-                    <tr>
-                        <td><?php echo escape($toplam['ad_soyad']); ?></td>
-                        <td><?php echo number_format($toplam['toplam_saat'], 2); ?></td>
-                        <td class="money"><?php echo formatMoney($toplam['toplam_tutar']); ?></td>
-                        <td class="money text-success"><?php echo formatMoney($toplam['toplam_odeme']); ?></td>
-                        <td class="money <?php echo $toplam['bakiye'] > 0 ? 'text-warning' : ''; ?>">
-                            <?php echo formatMoney($toplam['bakiye']); ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
 
 <!-- Filtre -->
 <div class="card mb-3">
     <div class="card-body">
         <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Personel</label>
+                <select class="form-select" name="personel_id" id="personelFiltre">
+                    <option value="0">Tümü</option>
+                    <?php
+                    try {
+                        $personelListesi = $pdo->query("SELECT id, ad_soyad FROM personel_listesi WHERE aktif = 1 ORDER BY ad_soyad")->fetchAll();
+                        foreach($personelListesi as $p):
+                    ?>
+                        <option value="<?php echo $p['id']; ?>" <?php echo $personel_filtre == $p['id'] ? 'selected' : ''; ?>>
+                            <?php echo escape($p['ad_soyad']); ?>
+                        </option>
+                    <?php endforeach; } catch(PDOException $e) {} ?>
+                </select>
+            </div>
             <div class="col-md-2">
                 <label class="form-label">Filtre Tipi</label>
                 <select class="form-select" name="mode" id="modeSelect">
@@ -175,7 +188,7 @@ if (isset($_GET['error'])) {
                     <option value="tarih" <?php echo $mode==='tarih'?'selected':''; ?>>Tarih Aralığı</option>
                 </select>
             </div>
-            <div id="tarihInputs" class="col-md-6 d-flex gap-2" style="<?php echo $mode==='tarih'?'':'display:none;'; ?>">
+            <div id="tarihInputs" class="col-md-5 d-flex gap-2" style="<?php echo $mode==='tarih'?'':'display:none;'; ?>">
                 <div class="flex-fill">
                     <label class="form-label">Başlangıç</label>
                     <input type="date" class="form-control" name="baslangic" value="<?php echo $baslangic; ?>">
@@ -187,7 +200,7 @@ if (isset($_GET['error'])) {
             </div>
             <div class="col-md-2">
                 <button type="submit" class="btn btn-primary">Filtrele</button>
-                <?php if ($mode !== 'bugun'): ?>
+                <?php if ($mode !== 'bugun' || $personel_filtre > 0): ?>
                     <a href="fazla_mesai.php" class="btn btn-outline-secondary">Temizle</a>
                 <?php endif; ?>
             </div>
@@ -195,62 +208,131 @@ if (isset($_GET['error'])) {
     </div>
 </div>
 
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <script>
-document.getElementById('modeSelect')?.addEventListener('change', function() {
-    const tarihInputs = document.getElementById('tarihInputs');
-    if (this.value === 'tarih') {
-        tarihInputs.style.display = '';
-    } else {
-        tarihInputs.style.display = 'none';
-    }
+document.addEventListener('DOMContentLoaded', function() {
+    // Select2 başlat
+    $('#personelFiltre').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Personel seçin...',
+        allowClear: true,
+        width: '100%'
+    });
+    
+    // Mod değişiminde tarih alanlarını göster/gizle
+    document.getElementById('modeSelect')?.addEventListener('change', function() {
+        const tarihInputs = document.getElementById('tarihInputs');
+        if (this.value === 'tarih') {
+            tarihInputs.style.display = '';
+        } else {
+            tarihInputs.style.display = 'none';
+        }
+    });
 });
 </script>
 
-<?php if (empty($fazlaMesailer)): ?>
-    <div class="alert alert-info">
-        <i class="bi bi-info-circle"></i> Henüz fazla mesai kaydı bulunmamaktadır.
-    </div>
-<?php else: ?>
-    <div class="card">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Personel</th>
-                            <th>Tarih</th>
-                            <th>Süre (Saat)</th>
-                            <th class="money">Saat Ücreti</th>
-                            <th class="money">Tutar</th>
-                            <th>Açıklama</th>
-                            <th>İşlemler</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($fazlaMesailer as $fm): ?>
-                            <tr>
-                                <td><?php echo escape($fm['ad_soyad']); ?></td>
-                                <td><?php echo formatDate($fm['tarih']); ?></td>
-                                <td><?php echo escape($fm['saat']); ?></td>
-                                <td class="money"><?php echo formatMoney($fm['saat_ucreti']); ?></td>
-                                <td class="money"><?php echo formatMoney($fm['tutar']); ?></td>
-                                <td><?php echo escape($fm['aciklama']); ?></td>
-                                <td>
-                                    <button class="btn btn-sm btn-warning" onclick="duzenleFazlaMesai(<?php echo $fm['id']; ?>)">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-danger" onclick="silFazlaMesai(<?php echo $fm['id']; ?>)">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+<div class="card">
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="fmTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="kayitlar-tab" data-bs-toggle="tab" data-bs-target="#kayitlar" type="button" role="tab">
+                    <i class="bi bi-list-ul"></i> Fazla Mesai Kayıtları
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="ozet-tab" data-bs-toggle="tab" data-bs-target="#ozet" type="button" role="tab">
+                    <i class="bi bi-calculator"></i> Kümülatif Toplamlar
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content pt-3" id="fmTabContent">
+            <!-- Tab 1: Fazla Mesai Kayıtları -->
+            <div class="tab-pane fade show active" id="kayitlar" role="tabpanel">
+                <?php if (empty($fazlaMesailer)): ?>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Henüz fazla mesai kaydı bulunmamaktadır.
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Personel</th>
+                                    <th>Tarih</th>
+                                    <th>Süre (Saat)</th>
+                                    <th class="money">Saat Ücreti</th>
+                                    <th class="money">Tutar</th>
+                                    <th>Açıklama</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($fazlaMesailer as $fm): ?>
+                                    <tr>
+                                        <td><?php echo escape($fm['ad_soyad']); ?></td>
+                                        <td><?php echo formatDate($fm['tarih']); ?></td>
+                                        <td><?php echo escape($fm['saat']); ?></td>
+                                        <td class="money"><?php echo formatMoney($fm['saat_ucreti']); ?></td>
+                                        <td class="money"><?php echo formatMoney($fm['tutar']); ?></td>
+                                        <td><?php echo escape($fm['aciklama']); ?></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-warning" onclick="duzenleFazlaMesai(<?php echo $fm['id']; ?>)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" onclick="silFazlaMesai(<?php echo $fm['id']; ?>)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Tab 2: Kümülatif Toplamlar -->
+            <div class="tab-pane fade" id="ozet" role="tabpanel">
+                <?php if (empty($kumulatifToplamlar)): ?>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Seçilen filtrede kümülatif veri bulunamadı.
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Personel</th>
+                                    <th>Toplam Saat</th>
+                                    <th class="money">Toplam FM</th>
+                                    <th class="money">Toplam Ödeme</th>
+                                    <th class="money">Bakiye</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach($kumulatifToplamlar as $toplam): ?>
+                                <tr>
+                                    <td><?php echo escape($toplam['ad_soyad']); ?></td>
+                                    <td><?php echo number_format($toplam['toplam_saat'], 2); ?></td>
+                                    <td class="money"><?php echo formatMoney($toplam['toplam_tutar']); ?></td>
+                                    <td class="money text-success"><?php echo formatMoney($toplam['toplam_odeme']); ?></td>
+                                    <td class="money <?php echo $toplam['bakiye'] > 0 ? 'text-warning' : ''; ?>">
+                                        <?php echo formatMoney($toplam['bakiye']); ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
-<?php endif; ?>
+</div>
 
 <!-- Fazla Mesai Ekle Modal -->
 <div class="modal fade" id="fazlaMesaiEkleModal" tabindex="-1">
@@ -284,7 +366,7 @@ document.getElementById('modeSelect')?.addEventListener('change', function() {
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Süre (Saat)</label>
-                            <input type="number" step="0.5" class="form-control" name="saat" value="0" required>
+                            <input type="number" step="0.01" min="0" max="999.99" class="form-control" name="saat" value="0" required>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Saat Ücreti</label>

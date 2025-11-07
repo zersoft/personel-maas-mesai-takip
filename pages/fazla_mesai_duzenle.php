@@ -74,7 +74,7 @@ if (isset($_GET['error'])) {
                 
                 <div class="col-md-4">
                     <label class="form-label">Süre (Saat)</label>
-                    <input type="number" step="0.5" class="form-control" name="saat" value="<?php echo $fazlaMesai['saat']; ?>" required>
+                    <input type="number" step="0.01" min="0" max="999.99" class="form-control" name="saat" value="<?php echo $fazlaMesai['saat']; ?>" required>
                 </div>
                 
                 <div class="col-md-4">

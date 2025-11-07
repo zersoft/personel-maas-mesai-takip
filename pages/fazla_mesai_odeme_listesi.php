@@ -34,9 +34,29 @@ try {
     $odemeler = $stmt->fetchAll();
 
     $personeller = $pdo->query("SELECT id, ad_soyad FROM personel_listesi WHERE aktif = 1 ORDER BY ad_soyad")->fetchAll();
+    
+    // Kümülatif toplamlar (toplu ödeme için)
+    $kumulatifToplamlar = [];
+    $tumPersoneller = $pdo->query("SELECT id, ad_soyad FROM personel_listesi WHERE aktif = 1 ORDER BY ad_soyad")->fetchAll();
+    foreach($tumPersoneller as $p) {
+        $kumulatifToplamlar[$p['id']] = ['ad_soyad' => $p['ad_soyad'], 'toplam_tutar' => 0, 'toplam_odeme' => 0, 'bakiye' => 0];
+    }
+    $fmStmt = $pdo->query("SELECT personel_id, SUM(tutar) as toplam FROM fazla_mesai GROUP BY personel_id");
+    foreach($fmStmt->fetchAll() as $r) {
+        if (isset($kumulatifToplamlar[$r['personel_id']])) $kumulatifToplamlar[$r['personel_id']]['toplam_tutar'] = (float)$r['toplam'];
+    }
+    $odStmt = $pdo->query("SELECT personel_id, SUM(tutar) as toplam FROM fazla_mesai_odeme GROUP BY personel_id");
+    foreach($odStmt->fetchAll() as $r) {
+        if (isset($kumulatifToplamlar[$r['personel_id']])) $kumulatifToplamlar[$r['personel_id']]['toplam_odeme'] = (float)$r['toplam'];
+    }
+    foreach($kumulatifToplamlar as $pid => &$t) {
+        $t['bakiye'] = $t['toplam_tutar'] - $t['toplam_odeme'];
+    }
+    $kumulatifToplamlar = array_filter($kumulatifToplamlar, function($t) { return $t['bakiye'] > 0; });
 } catch(PDOException $e) {
     $odemeler = [];
     $personeller = [];
+    $kumulatifToplamlar = [];
 }
 
 include '../includes/header.php';
@@ -51,10 +71,18 @@ if (isset($_GET['error'])) {
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-receipt"></i> Fazla Mesai Ödeme Listesi</h1>
-    <a href="fazla_mesai.php" class="btn btn-secondary">
-        <i class="bi bi-arrow-left"></i> Fazla Mesaiye Dön
-    </a>
+    <div class="d-flex gap-2">
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#odemeYapModal">
+            <i class="bi bi-cash-coin"></i> Ödeme Yap
+        </button>
+        <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#topluOdemeModal">
+            <i class="bi bi-cash-stack"></i> Toplu Ödeme
+        </button>
+        <a href="fazla_mesai.php" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Fazla Mesaiye Dön
+        </a>
     </div>
+</div>
 
 <div class="card mb-3">
     <div class="card-body">
@@ -149,6 +177,113 @@ function silOdeme(id) {
         window.location.href = 'fazla_mesai_odeme_kayit_islem.php?action=delete&id=' + id;
     }
 }
+</script>
+
+<!-- Ödeme Yap Modal -->
+<div class="modal fade" id="odemeYapModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Fazla Mesai Ödeme Yap</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="fazla_mesai_odeme_kayit_islem.php" method="POST">
+                <input type="hidden" name="action" value="single_payment">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Personel</label>
+                        <select class="form-select" name="personel_id" required>
+                            <option value="">Seçiniz...</option>
+                            <?php foreach($personeller as $personel): ?>
+                                <option value="<?php echo $personel['id']; ?>">
+                                    <?php echo escape($personel['ad_soyad']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ödeme Tarihi</label>
+                        <input type="date" class="form-control" name="odeme_tarihi" value="<?php echo date('Y-m-d'); ?>" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tutar (₺)</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="tutar" value="0" required>
+                            <span class="input-group-text">₺</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Açıklama</label>
+                        <textarea class="form-control" name="aciklama" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-success">Ödeme Yap</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Toplu Ödeme Modal -->
+<div class="modal fade" id="topluOdemeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Toplu Fazla Mesai Ödemesi</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="fazla_mesai_odeme_kayit_islem.php" method="POST">
+                <input type="hidden" name="action" value="bulk_payment">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ödeme Tarihi</label>
+                        <input type="date" class="form-control" name="odeme_tarihi" value="<?php echo date('Y-m-d'); ?>" required>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="selectAllOdeme"></th>
+                                    <th>Personel</th>
+                                    <th class="text-end">Bakiye</th>
+                                    <th>Tutar (₺)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach($kumulatifToplamlar as $pid => $toplam): 
+                                    if ($toplam['bakiye'] <= 0) continue;
+                                ?>
+                                    <tr>
+                                        <td><input type="checkbox" class="personel-check-odeme" name="personel[<?php echo $pid; ?>][secili]" value="1"></td>
+                                        <td><?php echo escape($toplam['ad_soyad']); ?></td>
+                                        <td class="text-end"><?php echo formatMoney($toplam['bakiye']); ?></td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <input type="text" class="form-control money-field" name="personel[<?php echo $pid; ?>][tutar]" value="<?php echo $toplam['bakiye']; ?>">
+                                                <span class="input-group-text">₺</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-success">Toplu Ödeme Yap</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('selectAllOdeme')?.addEventListener('change', function() {
+    document.querySelectorAll('.personel-check-odeme').forEach(cb => cb.checked = this.checked);
+});
 </script>
 
 <?php include '../includes/footer.php'; ?>

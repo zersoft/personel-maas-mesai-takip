@@ -148,7 +148,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (ob_get_level() > 0) { @ob_end_clean(); }
         safeRedirect('fazla_mesai.php?error=' . urlencode($e->getMessage()));
     }
-} else {
+}
+
+// Toplu ekleme işlemi
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'bulk_insert') {
+    try {
+        $tarih = $_POST['tarih'] ?? date('Y-m-d');
+        $items = $_POST['items'] ?? [];
+        
+        if (empty($items)) {
+            throw new Exception('Kayıt seçilmedi');
+        }
+        
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare('INSERT INTO fazla_mesai (personel_id, tarih, saat, saat_ucreti, aciklama) VALUES (?,?,?,?,?)');
+        
+        foreach ($items as $pid => $it) {
+            if (!isset($it['dahil'])) continue;
+            $personel_id = (int)$pid;
+            $saat = isset($it['saat']) ? floatval($it['saat']) : 0;
+            if ($saat <= 0) continue;
+            
+            $saat_ucreti = isset($it['saat_ucreti_raw']) 
+                ? parseMoneyLocal($it['saat_ucreti_raw']) 
+                : parseMoneyLocal($it['saat_ucreti'] ?? 0);
+            $aciklama = $it['aciklama'] ?? null;
+            
+            if ($personel_id > 0 && $saat > 0) {
+                $stmt->execute([$personel_id, $tarih, $saat, $saat_ucreti, $aciklama]);
+            }
+        }
+        
+        $pdo->commit();
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('fazla_mesai.php?success=1');
+    } catch(PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('toplu_fazla_mesai.php?error=' . urlencode($e->getMessage()));
+    } catch(Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        if (ob_get_level() > 0) { @ob_end_clean(); }
+        safeRedirect('toplu_fazla_mesai.php?error=' . urlencode($e->getMessage()));
+    }
+}
+
+if (!isset($_POST['action']) && !isset($_GET['action'])) {
     if (ob_get_level() > 0) { @ob_end_clean(); }
     safeRedirect('fazla_mesai.php');
 }
