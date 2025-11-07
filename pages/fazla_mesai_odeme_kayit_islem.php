@@ -1,34 +1,32 @@
 <?php
-require_once '../config/db.php';
-require_once '../includes/functions.php';
+// Session başlat
+if (session_status() === PHP_SESSION_NONE) {
+	$appSessionPath = __DIR__ . '/../storage/sessions';
+	if (!is_dir($appSessionPath)) {
+		@mkdir($appSessionPath, 0777, true);
+	}
+	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
+		ini_set('session.save_path', $appSessionPath);
+	}
+	ini_set('session.cookie_lifetime', 0);
+	ini_set('session.cookie_path', '/');
+	ini_set('session.cookie_httponly', 1);
+	ini_set('session.use_only_cookies', 1);
+	@session_start();
+}
 
 if (ob_get_level() === 0) { ob_start(); }
 
+require_once '../config/db.php';
+require_once '../includes/functions.php';
+require_once '../includes/auth.php';
+
+// Giriş kontrolü
+requireLogin();
+
+// parseMoneyLocal için parseMoney kullan
 function parseMoneyLocal($value) {
-    if ($value === null || $value === '' || $value === false) return 0;
-    $value = (string)$value;
-    $value = str_replace('₺', '', $value);
-    $value = trim($value);
-    if ($value === '') return 0;
-    if (strpos($value, ',') !== false && strpos($value, '.') !== false) {
-        $value = str_replace('.', '', $value);
-        $value = str_replace(',', '.', $value);
-    } elseif (strpos($value, ',') !== false) {
-        $value = str_replace('.', '', $value);
-        $value = str_replace(',', '.', $value);
-    } else {
-        $parts = explode('.', $value);
-        if (count($parts) > 1) {
-            $last = array_pop($parts);
-            if (strlen($last) <= 2) {
-                $value = implode('', $parts) . '.' . $last;
-            } else {
-                $value = implode('', $parts) . $last;
-            }
-        }
-    }
-    $value = preg_replace('/[^0-9.]/', '', $value);
-    return (float)$value;
+    return parseMoney($value);
 }
 
 try {
@@ -43,9 +41,25 @@ try {
             throw new Exception('Geçersiz veri');
         }
         
-        $stmt = $pdo->prepare('INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama) VALUES (?,?,?,?)');
-        $stmt->execute([$personel_id, $odeme_tarihi, $tutar, $aciklama]);
+        $userId = getCurrentUserId();
         
+        // created_by kontrolü
+        $hasCreatedBy = false;
+        try {
+            $checkStmt = $pdo->query("SHOW COLUMNS FROM fazla_mesai_odeme LIKE 'created_by'");
+            $hasCreatedBy = $checkStmt->rowCount() > 0;
+        } catch(PDOException $e) {}
+        
+        if ($hasCreatedBy) {
+            $stmt = $pdo->prepare('INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama, created_by) VALUES (?,?,?,?,?)');
+            $stmt->execute([$personel_id, $odeme_tarihi, $tutar, $aciklama, $userId]);
+        } else {
+            $stmt = $pdo->prepare('INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama) VALUES (?,?,?,?)');
+            $stmt->execute([$personel_id, $odeme_tarihi, $tutar, $aciklama]);
+        }
+        
+        $newId = $pdo->lastInsertId();
+        logUserAction('fazla_mesai_odeme', 'INSERT', $newId, "Tek ödeme: " . formatMoney($tutar));
         if (ob_get_level() > 0) { @ob_end_clean(); }
         safeRedirect('fazla_mesai.php?success=1');
     }
@@ -59,14 +73,35 @@ try {
             throw new Exception('Personel seçilmedi');
         }
         
-        $pdo->beginTransaction();
-        $stmt = $pdo->prepare('INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama) VALUES (?,?,?,?)');
+        $userId = getCurrentUserId();
         
+        // created_by kontrolü
+        $hasCreatedBy = false;
+        try {
+            $checkStmt = $pdo->query("SHOW COLUMNS FROM fazla_mesai_odeme LIKE 'created_by'");
+            $hasCreatedBy = $checkStmt->rowCount() > 0;
+        } catch(PDOException $e) {}
+        
+        if ($hasCreatedBy) {
+            $stmt = $pdo->prepare('INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama, created_by) VALUES (?,?,?,?,?)');
+        } else {
+            $stmt = $pdo->prepare('INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama) VALUES (?,?,?,?)');
+        }
+        
+        $pdo->beginTransaction();
         foreach ($personel as $pid => $data) {
             if (!isset($data['secili'])) continue;
             $tutar = isset($data['tutar']) ? parseMoneyLocal($data['tutar']) : 0;
             if ($tutar <= 0) continue;
-            $stmt->execute([$pid, $odeme_tarihi, $tutar, 'Toplu ödeme']);
+            
+            if ($hasCreatedBy) {
+                $stmt->execute([$pid, $odeme_tarihi, $tutar, 'Toplu ödeme', $userId]);
+            } else {
+                $stmt->execute([$pid, $odeme_tarihi, $tutar, 'Toplu ödeme']);
+            }
+            
+            $newId = $pdo->lastInsertId();
+            logUserAction('fazla_mesai_odeme', 'INSERT', $newId, "Toplu ödeme: " . formatMoney($tutar));
         }
         
         $pdo->commit();
@@ -81,6 +116,7 @@ try {
         }
         $del = $pdo->prepare("DELETE FROM fazla_mesai_odeme WHERE id = ?");
         $del->execute([$id]);
+        logUserAction('fazla_mesai_odeme', 'DELETE', $id, "Ödeme kaydı silindi");
         if (ob_get_level() > 0) { @ob_end_clean(); }
         safeRedirect('fazla_mesai_odeme_listesi.php?success=1');
     }
@@ -94,8 +130,24 @@ try {
         if ($id <= 0 || $personel_id <= 0) {
             throw new Exception('Geçersiz parametreler');
         }
-        $upd = $pdo->prepare("UPDATE fazla_mesai_odeme SET personel_id = ?, odeme_tarihi = ?, tutar = ?, aciklama = ? WHERE id = ?");
-        $upd->execute([$personel_id, $odeme_tarihi, $tutar, $aciklama ?: null, $id]);
+        $userId = getCurrentUserId();
+        
+        // updated_by kontrolü
+        $hasUpdatedBy = false;
+        try {
+            $checkStmt = $pdo->query("SHOW COLUMNS FROM fazla_mesai_odeme LIKE 'updated_by'");
+            $hasUpdatedBy = $checkStmt->rowCount() > 0;
+        } catch(PDOException $e) {}
+        
+        if ($hasUpdatedBy) {
+            $upd = $pdo->prepare("UPDATE fazla_mesai_odeme SET personel_id = ?, odeme_tarihi = ?, tutar = ?, aciklama = ?, updated_by = ? WHERE id = ?");
+            $upd->execute([$personel_id, $odeme_tarihi, $tutar, $aciklama ?: null, $userId, $id]);
+        } else {
+            $upd = $pdo->prepare("UPDATE fazla_mesai_odeme SET personel_id = ?, odeme_tarihi = ?, tutar = ?, aciklama = ? WHERE id = ?");
+            $upd->execute([$personel_id, $odeme_tarihi, $tutar, $aciklama ?: null, $id]);
+        }
+        
+        logUserAction('fazla_mesai_odeme', 'UPDATE', $id, "Ödeme kaydı güncellendi: " . formatMoney($tutar));
         if (ob_get_level() > 0) { @ob_end_clean(); }
         safeRedirect('fazla_mesai_odeme_listesi.php?success=1');
     }
@@ -104,9 +156,17 @@ try {
     if (ob_get_level() > 0) { @ob_end_clean(); }
     safeRedirect('fazla_mesai_odeme_listesi.php');
 } catch(PDOException $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    error_log("FM ödeme kayıt hatası: " . $e->getMessage());
     if (ob_get_level() > 0) { @ob_end_clean(); }
     safeRedirect('fazla_mesai_odeme_listesi.php?error=' . urlencode($e->getMessage()));
 } catch(Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    error_log("FM ödeme kayıt hatası: " . $e->getMessage());
     if (ob_get_level() > 0) { @ob_end_clean(); }
     safeRedirect('fazla_mesai_odeme_listesi.php?error=' . urlencode($e->getMessage()));
 }

@@ -2,22 +2,24 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Session başlat (header.php'den önce)
-if (session_status() === PHP_SESSION_NONE) {
-	$appSessionPath = __DIR__ . '/storage/sessions';
-	if (!is_dir($appSessionPath)) {
-		@mkdir($appSessionPath, 0777, true);
-	}
-	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
-		ini_set('session.save_path', $appSessionPath);
-	}
-	// Cookie ayarları
-	ini_set('session.cookie_lifetime', 0);
-	ini_set('session.cookie_path', '/');
-	ini_set('session.cookie_httponly', 1);
-	ini_set('session.use_only_cookies', 1);
-	@session_start();
+// Auth'u atla
+define('SKIP_AUTH', true);
+
+// Session başlat
+$sessionPath = sys_get_temp_dir() . '/php_sessions';
+if (!is_dir($sessionPath)) {
+    @mkdir($sessionPath, 0777, true);
 }
+if (is_dir($sessionPath) && is_writable($sessionPath)) {
+    session_save_path($sessionPath);
+}
+@session_start();
+
+// Fake session (test için)
+$_SESSION['user_id'] = 1;
+$_SESSION['username'] = 'admin';
+$_SESSION['ad_soyad'] = 'Test User';
+$_SESSION['rol'] = 'admin';
 
 require_once 'config/db.php';
 require_once 'includes/functions.php';
@@ -31,25 +33,19 @@ try {
     $toplamFazlaMesai = $pdo->query("SELECT SUM(saat) as toplam FROM fazla_mesai")->fetch()['toplam'] ?? 0;
     $toplamAvans = $pdo->query("SELECT SUM(avans_tutari) as toplam FROM avans_takip")->fetch()['toplam'] ?? 0;
 } catch(PDOException $e) {
-    // Hata olsa bile devam et
     $personelSayisi = 0;
     $toplamBordro = 0;
     $toplamFazlaMesai = 0;
     $toplamAvans = 0;
-    // Hatayı logla ama sayfayı göster
     error_log("Index.php DB Error: " . $e->getMessage());
 }
 
-try {
-    include 'includes/header.php';
-} catch(Exception $e) {
-    die("Header yükleme hatası: " . $e->getMessage());
-}
+include 'includes/header.php';
 ?>
 
 <div class="row">
     <div class="col-md-12">
-        <h1 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard</h1>
+        <h1 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard (No Auth Test)</h1>
     </div>
 </div>
 
@@ -111,38 +107,8 @@ try {
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Hızlı Erişim</h5>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <a href="pages/personel_listesi.php" class="btn btn-outline-primary w-100">
-                            <i class="bi bi-person-plus"></i> Personel Ekle
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="pages/bordro.php" class="btn btn-outline-success w-100">
-                            <i class="bi bi-cash-stack"></i> Bordro Oluştur
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="pages/fazla_mesai.php" class="btn btn-outline-warning w-100">
-                            <i class="bi bi-clock"></i> Fazla Mesai Kaydet
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="pages/raporlar.php" class="btn btn-outline-info w-100">
-                            <i class="bi bi-file-earmark-bar-graph"></i> Raporlar
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="alert alert-warning mt-4">
+    <strong>Not:</strong> Bu auth kontrolsüz test sayfasıdır. Normal index: <a href="index.php">index.php</a>
 </div>
 
 <?php include 'includes/footer.php'; ?>

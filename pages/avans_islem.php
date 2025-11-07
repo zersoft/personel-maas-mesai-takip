@@ -1,46 +1,28 @@
 <?php
+// Session başlat
+if (session_status() === PHP_SESSION_NONE) {
+	$appSessionPath = __DIR__ . '/../storage/sessions';
+	if (!is_dir($appSessionPath)) {
+		@mkdir($appSessionPath, 0777, true);
+	}
+	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
+		ini_set('session.save_path', $appSessionPath);
+	}
+	ini_set('session.cookie_lifetime', 0);
+	ini_set('session.cookie_path', '/');
+	ini_set('session.cookie_httponly', 1);
+	ini_set('session.use_only_cookies', 1);
+	@session_start();
+}
+
 require_once '../config/db.php';
 require_once '../includes/functions.php';
+require_once '../includes/auth.php';
+
+// Giriş kontrolü
+requireLogin();
 
 ob_start();
-
-function safeRedirect($url) {
-    // Çıktıyı temizle ve header ile yönlendir
-    if (ob_get_level() > 0) { @ob_end_clean(); }
-    header('Location: ' . $url);
-    // Header çalışmazsa (ör. önceden çıktı) JS/Meta ile yönlendir
-    echo '<!doctype html><html><head><meta charset="utf-8">'
-        . '<meta http-equiv="refresh" content="0;url=' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">'
-        . '</head><body>'
-        . '<script>location.replace(' . json_encode($url) . ');</script>'
-        . '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">Yönlendiriliyorsunuz...</a>'
-        . '</body></html>';
-    exit;
-}
-
-function parseMoney($value) {
-    if ($value === null || $value === '' || $value === false) return 0;
-    $value = (string)$value;
-    $value = str_replace('₺', '', $value);
-    $value = trim($value);
-    if ($value === '' || $value === '0') return 0;
-    if (strpos($value, ',') !== false) {
-        $value = str_replace('.', '', $value);
-        $value = str_replace(',', '.', $value);
-    } else {
-        $parts = explode('.', $value);
-        if (count($parts) > 1) {
-            $last = array_pop($parts);
-            if (strlen($last) <= 2) {
-                $value = implode('', $parts) . '.' . $last;
-            } else {
-                $value = implode('', $parts) . $last;
-            }
-        }
-    }
-    $value = preg_replace('/[^0-9.]/', '', $value);
-    return (float)$value;
-}
 
 try {
     // DELETE (GET)
@@ -49,6 +31,7 @@ try {
         if ($id <= 0) throw new Exception('Geçersiz avans.');
         $del = $pdo->prepare('DELETE FROM avans_takip WHERE id = ?');
         $del->execute([$id]);
+        logUserAction('avans_takip', 'DELETE', $id, "Avans silindi");
         safeRedirect('avans_takip.php?success=' . urlencode('Avans silindi.'));
     }
 
@@ -71,15 +54,50 @@ try {
     if ($action === 'update') {
         $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
         if ($id <= 0) throw new Exception('Geçersiz avans.');
-        $upd = $pdo->prepare('UPDATE avans_takip SET personel_id=?, tarih=?, bordro_ay=?, bordro_yil=?, avans_tutari=?, banka_tutari=?, nakit_tutari=?, aciklama=? WHERE id=?');
-        $upd->execute([$personel_id, $tarih, $bordro_ay, $bordro_yil, ($banka_tutari + $nakit_tutari), $banka_tutari, $nakit_tutari, $aciklama, $id]);
+        
+        // updated_by kontrolü
+        $hasUpdatedBy = false;
+        try {
+            $checkStmt = $pdo->query("SHOW COLUMNS FROM avans_takip LIKE 'updated_by'");
+            $hasUpdatedBy = $checkStmt->rowCount() > 0;
+        } catch(PDOException $e) {}
+        
+        $userId = getCurrentUserId();
+        
+        if ($hasUpdatedBy) {
+            $upd = $pdo->prepare('UPDATE avans_takip SET personel_id=?, tarih=?, bordro_ay=?, bordro_yil=?, avans_tutari=?, banka_tutari=?, nakit_tutari=?, aciklama=?, updated_by=? WHERE id=?');
+            $upd->execute([$personel_id, $tarih, $bordro_ay, $bordro_yil, ($banka_tutari + $nakit_tutari), $banka_tutari, $nakit_tutari, $aciklama, $userId, $id]);
+        } else {
+            $upd = $pdo->prepare('UPDATE avans_takip SET personel_id=?, tarih=?, bordro_ay=?, bordro_yil=?, avans_tutari=?, banka_tutari=?, nakit_tutari=?, aciklama=? WHERE id=?');
+            $upd->execute([$personel_id, $tarih, $bordro_ay, $bordro_yil, ($banka_tutari + $nakit_tutari), $banka_tutari, $nakit_tutari, $aciklama, $id]);
+        }
+        
+        logUserAction('avans_takip', 'UPDATE', $id, "Avans güncellendi: " . formatMoney($banka_tutari + $nakit_tutari));
         safeRedirect('avans_takip.php?success=' . urlencode('Avans güncellendi.'));
     } else {
-        $ins = $pdo->prepare('INSERT INTO avans_takip (personel_id, tarih, bordro_ay, bordro_yil, avans_tutari, banka_tutari, nakit_tutari, aciklama) VALUES (?,?,?,?,?,?,?,?)');
-        $ins->execute([$personel_id, $tarih, $bordro_ay, $bordro_yil, ($banka_tutari + $nakit_tutari), $banka_tutari, $nakit_tutari, $aciklama]);
+        // created_by kontrolü
+        $hasCreatedBy = false;
+        try {
+            $checkStmt = $pdo->query("SHOW COLUMNS FROM avans_takip LIKE 'created_by'");
+            $hasCreatedBy = $checkStmt->rowCount() > 0;
+        } catch(PDOException $e) {}
+        
+        $userId = getCurrentUserId();
+        
+        if ($hasCreatedBy) {
+            $ins = $pdo->prepare('INSERT INTO avans_takip (personel_id, tarih, bordro_ay, bordro_yil, avans_tutari, banka_tutari, nakit_tutari, aciklama, created_by) VALUES (?,?,?,?,?,?,?,?,?)');
+            $ins->execute([$personel_id, $tarih, $bordro_ay, $bordro_yil, ($banka_tutari + $nakit_tutari), $banka_tutari, $nakit_tutari, $aciklama, $userId]);
+        } else {
+            $ins = $pdo->prepare('INSERT INTO avans_takip (personel_id, tarih, bordro_ay, bordro_yil, avans_tutari, banka_tutari, nakit_tutari, aciklama) VALUES (?,?,?,?,?,?,?,?)');
+            $ins->execute([$personel_id, $tarih, $bordro_ay, $bordro_yil, ($banka_tutari + $nakit_tutari), $banka_tutari, $nakit_tutari, $aciklama]);
+        }
+        
+        $newId = $pdo->lastInsertId();
+        logUserAction('avans_takip', 'INSERT', $newId, "Yeni avans eklendi: " . formatMoney($banka_tutari + $nakit_tutari));
         safeRedirect('avans_takip.php?success=1');
     }
 } catch (Throwable $e) {
+    error_log("Avans işlem hatası: " . $e->getMessage());
     safeRedirect('avans_takip.php?error=' . urlencode($e->getMessage()));
 }
 

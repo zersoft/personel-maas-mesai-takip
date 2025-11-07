@@ -1,39 +1,29 @@
 <?php
+// Session başlat
+if (session_status() === PHP_SESSION_NONE) {
+	$appSessionPath = __DIR__ . '/../storage/sessions';
+	if (!is_dir($appSessionPath)) {
+		@mkdir($appSessionPath, 0777, true);
+	}
+	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
+		ini_set('session.save_path', $appSessionPath);
+	}
+	ini_set('session.cookie_lifetime', 0);
+	ini_set('session.cookie_path', '/');
+	ini_set('session.cookie_httponly', 1);
+	ini_set('session.use_only_cookies', 1);
+	@session_start();
+}
+
 // Output buffering başlat - header gönderilmeden önce çıktı olmasın
 ob_start();
 
 require_once '../config/db.php';
 require_once '../includes/functions.php';
+require_once '../includes/auth.php';
 
-// Para alanlarını parse et (binlik ayraçları kaldır)
-function parseMoney($value) {
-    if ($value === null) return 0;
-    $value = trim((string)$value);
-    if ($value === '' || $value === '0') return 0;
-
-    $value = str_replace('₺', '', $value);
-    $value = trim($value);
-
-    if (strpos($value, ',') !== false) {
-        // TR formatı
-        $value = str_replace('.', '', $value);
-        $value = str_replace(',', '.', $value);
-    } else {
-        // EN veya sade sayı
-        $parts = explode('.', $value);
-        if (count($parts) > 2) {
-            $last = array_pop($parts);
-            $value = implode('', $parts) . '.' . $last;
-        }
-    }
-
-    $value = preg_replace('/[^0-9.]/', '', $value);
-    $parts = explode('.', $value);
-    if (count($parts) > 2) {
-        $value = implode('', array_slice($parts, 0, -1)) . '.' . end($parts);
-    }
-    return (float)$value;
-}
+// Giriş kontrolü
+requireLogin();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -63,12 +53,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $pdo->beginTransaction();
         
-        $stmt = $pdo->prepare("
-            INSERT INTO bordro 
-            (personel_id, yil, ay, brut_maas, sgk_banka, ek_odenek, ek_odenek_banka, ek_odenek_nakit, 
-             izin_gunu, izin_kesintisi, sgk_kesintisi, diger_kesintiler, banka_avans, nakit_avans) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
+        $userId = getCurrentUserId();
+        
+        // created_by kontrolü
+        $hasCreatedBy = false;
+        try {
+            $checkStmt = $pdo->query("SHOW COLUMNS FROM bordro LIKE 'created_by'");
+            $hasCreatedBy = $checkStmt->rowCount() > 0;
+        } catch(PDOException $e) {}
+        
+        if ($hasCreatedBy) {
+            $stmt = $pdo->prepare("
+                INSERT INTO bordro 
+                (personel_id, yil, ay, brut_maas, sgk_banka, ek_odenek, ek_odenek_banka, ek_odenek_nakit, 
+                 izin_gunu, izin_kesintisi, sgk_kesintisi, diger_kesintiler, banka_avans, nakit_avans, created_by) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO bordro 
+                (personel_id, yil, ay, brut_maas, sgk_banka, ek_odenek, ek_odenek_banka, ek_odenek_nakit, 
+                 izin_gunu, izin_kesintisi, sgk_kesintisi, diger_kesintiler, banka_avans, nakit_avans) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+        }
 
         $eklenenSayisi = 0;
         foreach($selected_personel as $personel_id) {
@@ -105,57 +113,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $banka_avans = (float)$avRow['banka'];
             $nakit_avans = (float)$avRow['nakit'];
             
-            $stmt->execute([
-                $personel_id,
-                $yil,
-                $ay,
-                $brut_maas,
-                $sgk_banka,
-                $ek_odenek_toplam,
-                $eko_banka,
-                $eko_nakit,
-                $izin_gunu,
-                $izin_kesintisi,
-                $sgk_kesintisi,
-                $diger_kesintiler_val,
-                $banka_avans,
-                $nakit_avans
-            ]);
+            if ($hasCreatedBy) {
+                $stmt->execute([
+                    $personel_id,
+                    $yil,
+                    $ay,
+                    $brut_maas,
+                    $sgk_banka,
+                    $ek_odenek_toplam,
+                    $eko_banka,
+                    $eko_nakit,
+                    $izin_gunu,
+                    $izin_kesintisi,
+                    $sgk_kesintisi,
+                    $diger_kesintiler_val,
+                    $banka_avans,
+                    $nakit_avans,
+                    $userId
+                ]);
+            } else {
+                $stmt->execute([
+                    $personel_id,
+                    $yil,
+                    $ay,
+                    $brut_maas,
+                    $sgk_banka,
+                    $ek_odenek_toplam,
+                    $eko_banka,
+                    $eko_nakit,
+                    $izin_gunu,
+                    $izin_kesintisi,
+                    $sgk_kesintisi,
+                    $diger_kesintiler_val,
+                    $banka_avans,
+                    $nakit_avans
+                ]);
+            }
+            
+            $newId = $pdo->lastInsertId();
+            logUserAction('bordro', 'INSERT', $newId, "Toplu bordro eklendi: Personel ID $personel_id, Ay $ay/$yil");
             $eklenenSayisi++;
         }
 
         $pdo->commit();
         
-        // Output buffer'ı temizle ve redirect yap
-        ob_end_clean();
-        
+        // Redirect yap
         if ($eklenenSayisi > 0) {
-            header('Location: toplu_bordro.php?success=1&ay=' . $ay . '&yil=' . $yil . '&eklenen=' . $eklenenSayisi);
+            safeRedirect('toplu_bordro.php?success=1&ay=' . $ay . '&yil=' . $yil . '&eklenen=' . $eklenenSayisi);
         } else {
-            header('Location: toplu_bordro.php?info=1&ay=' . $ay . '&yil=' . $yil . '&mesaj=' . urlencode('Seçili personeller için bordro zaten mevcut.'));
+            safeRedirect('toplu_bordro.php?info=1&ay=' . $ay . '&yil=' . $yil . '&mesaj=' . urlencode('Seçili personeller için bordro zaten mevcut.'));
         }
-        exit;
     } catch(PDOException $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
         error_log('Toplu Bordro Hatası: ' . $e->getMessage());
-        ob_end_clean();
-        header('Location: toplu_bordro.php?error=' . urlencode('Veritabanı hatası: ' . $e->getMessage()));
-        exit;
+        safeRedirect('toplu_bordro.php?error=' . urlencode('Veritabanı hatası: ' . $e->getMessage()));
     } catch(Exception $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
         error_log('Toplu Bordro Hatası: ' . $e->getMessage());
-        ob_end_clean();
-        header('Location: toplu_bordro.php?error=' . urlencode($e->getMessage()));
-        exit;
+        safeRedirect('toplu_bordro.php?error=' . urlencode($e->getMessage()));
     }
 } else {
-    ob_end_clean();
-    header('Location: toplu_bordro.php');
-    exit;
+    safeRedirect('toplu_bordro.php');
 }
 ?>
 

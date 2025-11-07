@@ -35,6 +35,57 @@ function formatMoney($amount) {
 }
 
 /**
+ * Para değerini parse et (TR/EN format desteği)
+ */
+function parseMoney($value) {
+    if (empty($value) || $value === '') return 0;
+    
+    // Zaten sayısal ise direkt dön
+    if (is_numeric($value)) {
+        return (float)$value;
+    }
+    
+    // String ise parse et
+    $value = trim($value);
+    
+    // Binlik ayırıcıları kaldır (nokta veya virgül)
+    // Önce binlik ayırıcıyı tespit et
+    $hasDot = strpos($value, '.') !== false;
+    $hasComma = strpos($value, ',') !== false;
+    
+    if ($hasDot && $hasComma) {
+        // Hem nokta hem virgül var - hangisi binlik hangisi ondalık?
+        $dotPos = strrpos($value, '.');
+        $commaPos = strrpos($value, ',');
+        
+        if ($dotPos > $commaPos) {
+            // Nokta ondalık, virgül binlik (İngiliz formatı: 1,234.56)
+            $value = str_replace(',', '', $value);
+        } else {
+            // Virgül ondalık, nokta binlik (Türk formatı: 1.234,56)
+            $value = str_replace('.', '', $value);
+            $value = str_replace(',', '.', $value);
+        }
+    } elseif ($hasComma) {
+        // Sadece virgül var - muhtemelen Türk formatı (ondalık)
+        $value = str_replace(',', '.', $value);
+    } elseif ($hasDot) {
+        // Sadece nokta var - muhtemelen İngiliz formatı (ondalık)
+        // Binlik ayırıcı olabilir, kontrol et
+        $parts = explode('.', $value);
+        if (count($parts) === 2 && strlen($parts[1]) <= 2) {
+            // Ondalık kısım 2 haneden az/equal - muhtemelen ondalık
+            // Olduğu gibi bırak
+        } else {
+            // Muhtemelen binlik ayırıcı - kaldır
+            $value = str_replace('.', '', $value);
+        }
+    }
+    
+    return (float)$value;
+}
+
+/**
  * Mesaj gösterimi
  */
 function showMessage($message, $type = 'success') {
@@ -86,5 +137,3 @@ function safeRedirect($url) {
         . '</body></html>';
     exit;
 }
-?>
-

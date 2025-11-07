@@ -134,10 +134,48 @@ CREATE TABLE IF NOT EXISTS puantaj (
     aciklama VARCHAR(255) NULL,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by INT NULL,
+    updated_by INT NULL,
     INDEX idx_puantaj_personel (personel_id),
     INDEX idx_puantaj_tarih (tarih),
     FOREIGN KEY (personel_id) REFERENCES personel_listesi(id) ON DELETE CASCADE
 );
+
+-- 8. Kullanıcılar
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    ad_soyad VARCHAR(150) NOT NULL,
+    email VARCHAR(100),
+    rol VARCHAR(20) NOT NULL DEFAULT 'user', -- admin, user, viewer
+    aktif BOOLEAN DEFAULT 1,
+    son_giris DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Varsayılan admin kullanıcısı (şifre: admin123)
+INSERT INTO users (username, password, ad_soyad, rol) 
+VALUES ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Sistem Yöneticisi', 'admin')
+ON DUPLICATE KEY UPDATE id=id;
+
+-- 9. Kullanıcı işlem logları
+CREATE TABLE IF NOT EXISTS user_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    islem_tipi VARCHAR(50) NOT NULL, -- INSERT, UPDATE, DELETE
+    tablo_adi VARCHAR(50) NOT NULL,
+    kayit_id INT NULL,
+    aciklama TEXT NULL,
+    ip_adresi VARCHAR(45) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user (user_id),
+    INDEX idx_tablo (tablo_adi),
+    INDEX idx_tarih (created_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =====================================
 -- VERİTABANI OLUŞTURMA TAMAMLANDI ✅

@@ -1,37 +1,33 @@
 <?php
-require_once '../config/db.php';
-require_once '../includes/functions.php';
+// Session başlat
+if (session_status() === PHP_SESSION_NONE) {
+	$appSessionPath = __DIR__ . '/../storage/sessions';
+	if (!is_dir($appSessionPath)) {
+		@mkdir($appSessionPath, 0777, true);
+	}
+	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
+		ini_set('session.save_path', $appSessionPath);
+	}
+	ini_set('session.cookie_lifetime', 0);
+	ini_set('session.cookie_path', '/');
+	ini_set('session.cookie_httponly', 1);
+	ini_set('session.use_only_cookies', 1);
+	@session_start();
+}
 
 // Çıktı tamponu; yönlendirme sorunlarını engelle
 if (ob_get_level() === 0) { ob_start(); }
 
-// Para parse (TR/EN uyumlu)
+require_once '../config/db.php';
+require_once '../includes/functions.php';
+require_once '../includes/auth.php';
+
+// Giriş kontrolü
+requireLogin();
+
+// parseMoneyLocal için parseMoney kullan
 function parseMoneyLocal($value) {
-    if ($value === null || $value === '' || $value === false) return 0;
-    $value = (string)$value;
-    $value = str_replace('₺', '', $value);
-    $value = trim($value);
-    if ($value === '') return 0;
-    if (strpos($value, ',') !== false && strpos($value, '.') !== false) {
-        // TR format
-        $value = str_replace('.', '', $value);
-        $value = str_replace(',', '.', $value);
-    } elseif (strpos($value, ',') !== false) {
-        $value = str_replace('.', '', $value);
-        $value = str_replace(',', '.', $value);
-    } else {
-        $parts = explode('.', $value);
-        if (count($parts) > 1) {
-            $last = array_pop($parts);
-            if (strlen($last) <= 2) {
-                $value = implode('', $parts) . '.' . $last;
-            } else {
-                $value = implode('', $parts) . $last;
-            }
-        }
-    }
-    $value = preg_replace('/[^0-9.]/', '', $value);
-    return (float)$value;
+    return parseMoney($value);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -50,100 +46,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('Personel seçilmedi');
         }
 
-        // Ödenmemiş fazla mesaileri getir
-        $stmt = $pdo->prepare("SELECT * FROM fazla_mesai WHERE personel_id = ? AND odendi = 0 ORDER BY tarih ASC");
-        $stmt->execute([$personel_id]);
-        $fazlaMesailer = $stmt->fetchAll();
-
-        if (empty($fazlaMesailer)) {
-            throw new Exception('Ödenmemiş fazla mesai bulunamadı');
+        if ($odeme_tutari <= 0) {
+            throw new Exception('Ödeme tutarı geçersiz');
         }
 
-        $toplamTutar = 0.0;
-        foreach($fazlaMesailer as $fm) {
-            $toplamTutar += (float)$fm['tutar'];
-        }
+        $userId = getCurrentUserId();
+        
+        // created_by kontrolü
+        $hasCreatedBy = false;
+        try {
+            $checkStmt = $pdo->query("SHOW COLUMNS FROM fazla_mesai_odeme LIKE 'created_by'");
+            $hasCreatedBy = $checkStmt->rowCount() > 0;
+        } catch(PDOException $e) {}
 
-        if ($odeme_tutari > $toplamTutar) {
-            throw new Exception('Ödeme tutarı toplam tutardan fazla olamaz');
-        }
-
-        $pdo->beginTransaction();
-
-        if ($tamamini_ode || $odeme_tutari >= $toplamTutar) {
-            // Tümünü öde
-            $update = $pdo->prepare("UPDATE fazla_mesai SET odendi = 1 WHERE personel_id = ? AND odendi = 0");
-            $update->execute([$personel_id]);
+        // Ödeme kaydı oluştur (sadece fazla_mesai_odeme tablosuna)
+        if ($hasCreatedBy) {
+            $insertPay = $pdo->prepare("INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama, created_by) VALUES (?, ?, ?, ?, ?)");
+            $insertPay->execute([
+                $personel_id,
+                $odeme_tarihi,
+                $odeme_tutari,
+                $aciklama ?: null,
+                $userId
+            ]);
         } else {
-            // Kısmi ödeme - satır bölme yaklaşımı
-            $kalanTutar = (float)$odeme_tutari;
-            foreach($fazlaMesailer as $fm) {
-                if ($kalanTutar <= 0) break;
-                
-                $rowTutar = (float)$fm['tutar'];
-                if ($kalanTutar >= $rowTutar) {
-                    // Tamamını öde
-                    $update = $pdo->prepare("UPDATE fazla_mesai SET odendi = 1 WHERE id = ?");
-                    $update->execute([$fm['id']]);
-                    $kalanTutar -= $rowTutar;
-                } else {
-                    // Bu satır için kısmi ödeme: satırı böl
-                    $saatUcreti = (float)$fm['saat_ucreti'];
-                    if ($saatUcreti <= 0) {
-                        throw new Exception('Saat ücreti geçersiz.');
-                    }
-                    $orijinalSaat = (float)$fm['saat'];
-                    $odenmisSaat = round($kalanTutar / $saatUcreti, 2);
-                    if ($odenmisSaat <= 0) {
-                        throw new Exception('Ödeme tutarı çok küçük.');
-                    }
-                    if ($odenmisSaat > $orijinalSaat) {
-                        $odenmisSaat = $orijinalSaat;
-                    }
-                    $kalanSaat = round($orijinalSaat - $odenmisSaat, 2);
-
-                    // 1) Orijinal satırı kalan saatle güncelle (ödenmemiş)
-                    $updOrig = $pdo->prepare("UPDATE fazla_mesai SET saat = ?, odendi = 0 WHERE id = ?");
-                    $updOrig->execute([$kalanSaat, $fm['id']]);
-
-                    // 2) Ödenen kısmı yeni satır olarak ekle (ödenmiş)
-                    $insPaid = $pdo->prepare("INSERT INTO fazla_mesai (personel_id, tarih, saat, saat_ucreti, odendi, aciklama) VALUES (?, ?, ?, ?, 1, ?)");
-                    $insPaid->execute([
-                        $personel_id,
-                        $odeme_tarihi,
-                        $odenmisSaat,
-                        $saatUcreti,
-                        'Kısmi ödeme (otomatik)'
-                    ]);
-
-                    $kalanTutar = 0.0;
-                }
-            }
+            $insertPay = $pdo->prepare("INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama) VALUES (?, ?, ?, ?)");
+            $insertPay->execute([
+                $personel_id,
+                $odeme_tarihi,
+                $odeme_tutari,
+                $aciklama ?: null
+            ]);
         }
 
-        // Ödeme kaydı oluştur (ayrı tabloya)
-        $odenenTutar = ($tamamini_ode || $odeme_tutari >= $toplamTutar) ? $toplamTutar : $odeme_tutari;
-        $insertPay = $pdo->prepare("INSERT INTO fazla_mesai_odeme (personel_id, odeme_tarihi, tutar, aciklama) VALUES (?, ?, ?, ?)");
-        $insertPay->execute([
-            $personel_id,
-            $odeme_tarihi,
-            $odenenTutar,
-            $aciklama ?: null
-        ]);
-
-        $pdo->commit();
+        $newId = $pdo->lastInsertId();
+        logUserAction('fazla_mesai_odeme', 'INSERT', $newId, "Fazla mesai ödemesi: " . formatMoney($odeme_tutari));
         if (ob_get_level() > 0) { @ob_end_clean(); }
         safeRedirect('fazla_mesai.php?success=1');
     } catch(PDOException $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
+        error_log("FM ödeme hatası: " . $e->getMessage());
         if (ob_get_level() > 0) { @ob_end_clean(); }
         safeRedirect('fazla_mesai_odeme.php?personel_id=' . ($personel_id ?? '') . '&error=' . urlencode($e->getMessage()));
     } catch(Exception $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
+        error_log("FM ödeme hatası: " . $e->getMessage());
         if (ob_get_level() > 0) { @ob_end_clean(); }
         safeRedirect('fazla_mesai_odeme.php?personel_id=' . ($personel_id ?? '') . '&error=' . urlencode($e->getMessage()));
     }

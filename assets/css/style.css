@@ -5,6 +5,25 @@ body {
     background-color: #f8f9fa;
 }
 
+/* Navbar aktif link stili */
+.navbar-nav .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 0.25rem;
+    font-weight: 500;
+}
+
+.navbar-nav .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 0.25rem;
+}
+
+/* Alt bar için özel stil */
+.navbar-dark .navbar-nav .nav-link {
+    padding: 0.5rem 1rem;
+    transition: background-color 0.2s;
+}
+
+/* Üst bar için stil */
 .navbar-brand {
     font-weight: bold;
     font-size: 1.25rem;

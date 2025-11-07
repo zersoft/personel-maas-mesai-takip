@@ -1,35 +1,33 @@
 <?php
-require_once '../config/db.php';
-require_once '../includes/functions.php';
+// Session başlat
+if (session_status() === PHP_SESSION_NONE) {
+	$appSessionPath = __DIR__ . '/../storage/sessions';
+	if (!is_dir($appSessionPath)) {
+		@mkdir($appSessionPath, 0777, true);
+	}
+	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
+		ini_set('session.save_path', $appSessionPath);
+	}
+	ini_set('session.cookie_lifetime', 0);
+	ini_set('session.cookie_path', '/');
+	ini_set('session.cookie_httponly', 1);
+	ini_set('session.use_only_cookies', 1);
+	@session_start();
+}
 
 // Çıktı tamponu: yönlendirme sorunlarını engelle
 if (ob_get_level() === 0) { ob_start(); }
 
-// Para/numara formatlarını güvenli parse eden yardımcı
+require_once '../config/db.php';
+require_once '../includes/functions.php';
+require_once '../includes/auth.php';
+
+// Giriş kontrolü
+requireLogin();
+
+// parseMoneyLocal için parseMoney kullan
 function parseMoneyLocal($value) {
-    if ($value === null || $value === '' || $value === false) return 0;
-    $value = (string)$value;
-    $value = str_replace('₺', '', $value);
-    $value = trim($value);
-    if ($value === '') return 0;
-    if (strpos($value, ',') !== false) {
-        // TR format: binlik nokta, ondalık virgül
-        $value = str_replace('.', '', $value);
-        $value = str_replace(',', '.', $value);
-    } else {
-        // EN format veya sade sayı: son nokta ondalık kabul edilir
-        $parts = explode('.', $value);
-        if (count($parts) > 1) {
-            $last = array_pop($parts);
-            if (strlen($last) <= 2) {
-                $value = implode('', $parts) . '.' . $last;
-            } else {
-                $value = implode('', $parts) . $last;
-            }
-        }
-    }
-    $value = preg_replace('/[^0-9.]/', '', $value);
-    return (float)$value;
+    return parseMoney($value);
 }
 
 // Silme işlemi
@@ -41,6 +39,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
         }
         $stmt = $pdo->prepare("DELETE FROM fazla_mesai WHERE id = ?");
         $stmt->execute([$id]);
+        logUserAction('fazla_mesai', 'DELETE', $id, "Fazla mesai silindi");
         if (ob_get_level() > 0) { @ob_end_clean(); }
         // Filtre parametrelerini koru (referer'dan)
         $returnParams = '';
@@ -87,21 +86,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             throw new Exception('Saat ücreti çok yüksek (maksimum 9.999,99 ₺).');
         }
 
-        $stmt = $pdo->prepare("
-            UPDATE fazla_mesai SET
-                personel_id = ?, tarih = ?, saat = ?, saat_ucreti = ?, aciklama = ?
-            WHERE id = ?
-        ");
+        $userId = getCurrentUserId();
+        
+        // updated_by kontrolü
+        $hasUpdatedBy = false;
+        try {
+            $checkStmt = $pdo->query("SHOW COLUMNS FROM fazla_mesai LIKE 'updated_by'");
+            $hasUpdatedBy = $checkStmt->rowCount() > 0;
+        } catch(PDOException $e) {}
+        
+        if ($hasUpdatedBy) {
+            $stmt = $pdo->prepare("
+                UPDATE fazla_mesai SET
+                    personel_id = ?, tarih = ?, saat = ?, saat_ucreti = ?, aciklama = ?, updated_by = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $personel_id,
+                $tarih,
+                $saat,
+                $saat_ucreti,
+                $aciklama ?: null,
+                $userId,
+                $id
+            ]);
+        } else {
+            $stmt = $pdo->prepare("
+                UPDATE fazla_mesai SET
+                    personel_id = ?, tarih = ?, saat = ?, saat_ucreti = ?, aciklama = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([
+                $personel_id,
+                $tarih,
+                $saat,
+                $saat_ucreti,
+                $aciklama ?: null,
+                $id
+            ]);
+        }
 
-        $stmt->execute([
-            $personel_id,
-            $tarih,
-            $saat,
-            $saat_ucreti,
-            $aciklama ?: null,
-            $id
-        ]);
-
+        logUserAction('fazla_mesai', 'UPDATE', $id, "Fazla mesai güncellendi");
         if (ob_get_level() > 0) { @ob_end_clean(); }
         // Filtre parametrelerini koru
         $returnParams = isset($_POST['return_params']) ? $_POST['return_params'] : '';
@@ -137,20 +162,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('Saat ücreti çok yüksek (maksimum 9.999,99 ₺).');
         }
 
-        $stmt = $pdo->prepare("
-            INSERT INTO fazla_mesai 
-            (personel_id, tarih, saat, saat_ucreti, aciklama) 
-            VALUES (?, ?, ?, ?, ?)
-        ");
+        $userId = getCurrentUserId();
+        
+        // created_by kontrolü
+        $hasCreatedBy = false;
+        try {
+            $checkStmt = $pdo->query("SHOW COLUMNS FROM fazla_mesai LIKE 'created_by'");
+            $hasCreatedBy = $checkStmt->rowCount() > 0;
+        } catch(PDOException $e) {}
+        
+        if ($hasCreatedBy) {
+            $stmt = $pdo->prepare("
+                INSERT INTO fazla_mesai 
+                (personel_id, tarih, saat, saat_ucreti, aciklama, created_by) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $personel_id,
+                $tarih,
+                $saat,
+                $saat_ucreti,
+                $aciklama ?: null,
+                $userId
+            ]);
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO fazla_mesai 
+                (personel_id, tarih, saat, saat_ucreti, aciklama) 
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $personel_id,
+                $tarih,
+                $saat,
+                $saat_ucreti,
+                $aciklama ?: null
+            ]);
+        }
 
-        $stmt->execute([
-            $personel_id,
-            $tarih,
-            $saat,
-            $saat_ucreti,
-            $aciklama ?: null
-        ]);
-
+        $newId = $pdo->lastInsertId();
+        logUserAction('fazla_mesai', 'INSERT', $newId, "Yeni fazla mesai eklendi");
         if (ob_get_level() > 0) { @ob_end_clean(); }
         safeRedirect('fazla_mesai.php?success=1');
     } catch(PDOException $e) {
