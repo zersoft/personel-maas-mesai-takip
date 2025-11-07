@@ -166,7 +166,7 @@ if (isset($_GET['error'])) {
 
 <!-- Fazla Mesai Ekle Modal -->
 <div class="modal fade" id="fazlaMesaiEkleModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Fazla Mesai Ekle</h5>
@@ -174,46 +174,48 @@ if (isset($_GET['error'])) {
             </div>
             <form action="fazla_mesai_islem.php" method="POST">
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Personel</label>
-                        <select class="form-select" name="personel_id" required>
-                            <option value="">Seçiniz...</option>
-                            <?php
-                            try {
-                                $personeller = $pdo->query("SELECT id, ad_soyad, mesai_saat_ucreti FROM personel_listesi WHERE aktif = 1 ORDER BY ad_soyad")->fetchAll();
-                                foreach($personeller as $personel):
-                            ?>
-                                <option value="<?php echo $personel['id']; ?>" data-ucret="<?php echo $personel['mesai_saat_ucreti']; ?>">
-                                    <?php echo escape($personel['ad_soyad']); ?>
-                                </option>
-                            <?php endforeach; } catch(PDOException $e) {} ?>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Tarih</label>
-                        <input type="date" class="form-control" name="tarih" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Süre (Saat)</label>
-                        <input type="number" step="0.5" class="form-control" name="saat" value="0" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Saat Ücreti</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="saat_ucreti" id="saat_ucreti" value="0" data-no-auto-format="true" inputmode="decimal" required>
-                            <input type="hidden" name="saat_ucreti_raw" id="saat_ucreti_raw" value="0">
-                            <span class="input-group-text">₺</span>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Personel</label>
+                            <select class="form-select" name="personel_id" required>
+                                <option value="">Seçiniz...</option>
+                                <?php
+                                try {
+                                    $personeller = $pdo->query("SELECT id, ad_soyad, mesai_saat_ucreti FROM personel_listesi WHERE aktif = 1 ORDER BY ad_soyad")->fetchAll();
+                                    foreach($personeller as $personel):
+                                ?>
+                                    <option value="<?php echo $personel['id']; ?>" data-ucret="<?php echo $personel['mesai_saat_ucreti']; ?>">
+                                        <?php echo escape($personel['ad_soyad']); ?>
+                                    </option>
+                                <?php endforeach; } catch(PDOException $e) {} ?>
+                            </select>
                         </div>
-                    </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="odendi" value="1">
-                            <label class="form-check-label">Ödendi</label>
+                        <div class="col-md-4">
+                            <label class="form-label">Tarih</label>
+                            <input type="date" class="form-control" name="tarih" required>
                         </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Açıklama</label>
-                        <textarea class="form-control" name="aciklama" rows="3"></textarea>
+                        <div class="col-md-4">
+                            <label class="form-label">Süre (Saat)</label>
+                            <input type="number" step="0.5" class="form-control" name="saat" value="0" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Saat Ücreti</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="saat_ucreti" id="saat_ucreti" value="0" data-no-auto-format="true" inputmode="decimal" required>
+                                <input type="hidden" name="saat_ucreti_raw" id="saat_ucreti_raw" value="0">
+                                <span class="input-group-text">₺</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="odendi" value="1">
+                                <label class="form-check-label">Ödendi</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Açıklama</label>
+                            <textarea class="form-control" name="aciklama" rows="2"></textarea>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

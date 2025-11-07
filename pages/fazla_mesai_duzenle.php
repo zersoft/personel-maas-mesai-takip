@@ -46,65 +46,61 @@ if (isset($_GET['error'])) {
     </a>
 </div>
 
-<div class="card">
+<div class="card" style="max-width: 800px; margin: 0 auto;">
     <div class="card-body">
         <form action="fazla_mesai_islem.php" method="POST">
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" value="<?php echo $fazlaMesai['id']; ?>">
             
-            <div class="mb-3">
-                <label class="form-label">Personel</label>
-                <select class="form-select" name="personel_id" id="personelSelect" required>
-                    <option value="">Seçiniz...</option>
-                    <?php foreach($personeller as $personel): ?>
-                        <option value="<?php echo $personel['id']; ?>" 
-                                data-ucret="<?php echo $personel['mesai_saat_ucreti']; ?>"
-                                <?php echo $personel['id'] == $fazlaMesai['personel_id'] ? 'selected' : ''; ?>>
-                            <?php echo escape($personel['ad_soyad']); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            
-            <div class="mb-3">
-                <label class="form-label">Tarih</label>
-                <input type="date" class="form-control" name="tarih" value="<?php echo $fazlaMesai['tarih']; ?>" required>
-            </div>
-            
-            <div class="mb-3">
-                <label class="form-label">Süre (Saat)</label>
-                <input type="number" step="0.5" class="form-control" name="saat" value="<?php echo $fazlaMesai['saat']; ?>" required>
-            </div>
-            
-            <div class="mb-3">
-                <label class="form-label">Saat Ücreti (₺)</label>
-                <div class="input-group">
-                    <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="saat_ucreti" id="saat_ucreti" value="<?php echo $fazlaMesai['saat_ucreti']; ?>" data-no-auto-format="true" inputmode="decimal" required>
-                    <input type="hidden" name="saat_ucreti_raw" id="saat_ucreti_raw" value="<?php echo $fazlaMesai['saat_ucreti']; ?>">
-                    <span class="input-group-text">₺</span>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Personel</label>
+                    <select class="form-select" name="personel_id" id="personelSelect" required>
+                        <option value="">Seçiniz...</option>
+                        <?php foreach($personeller as $personel): ?>
+                            <option value="<?php echo $personel['id']; ?>" 
+                                    data-ucret="<?php echo $personel['mesai_saat_ucreti']; ?>"
+                                    <?php echo $personel['id'] == $fazlaMesai['personel_id'] ? 'selected' : ''; ?>>
+                                <?php echo escape($personel['ad_soyad']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="col-md-6">
+                    <label class="form-label">Tarih</label>
+                    <input type="date" class="form-control" name="tarih" value="<?php echo $fazlaMesai['tarih']; ?>" required>
+                </div>
+                
+                <div class="col-md-4">
+                    <label class="form-label">Süre (Saat)</label>
+                    <input type="number" step="0.5" class="form-control" name="saat" value="<?php echo $fazlaMesai['saat']; ?>" required>
+                </div>
+                
+                <div class="col-md-4">
+                    <label class="form-label">Saat Ücreti (₺)</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control money-field" pattern="[0-9.,]+" name="saat_ucreti" id="saat_ucreti" value="<?php echo $fazlaMesai['saat_ucreti']; ?>" data-no-auto-format="true" inputmode="decimal" required>
+                        <input type="hidden" name="saat_ucreti_raw" id="saat_ucreti_raw" value="<?php echo $fazlaMesai['saat_ucreti']; ?>">
+                        <span class="input-group-text">₺</span>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <label class="form-label d-block">&nbsp;</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="odendi" value="1" id="odendi" <?php echo $fazlaMesai['odendi'] ? 'checked' : ''; ?>>
+                        <label class="form-check-label" for="odendi">Ödendi</label>
+                    </div>
+                </div>
+                
+                <div class="col-12">
+                    <label class="form-label">Açıklama</label>
+                    <textarea class="form-control" name="aciklama" rows="2"><?php echo escape($fazlaMesai['aciklama'] ?? ''); ?></textarea>
                 </div>
             </div>
             
-            <div class="mb-3">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="odendi" value="1" id="odendi" <?php echo $fazlaMesai['odendi'] ? 'checked' : ''; ?>>
-                    <label class="form-check-label" for="odendi">Ödendi</label>
-                </div>
-            </div>
-            
-            <?php if($fazlaMesai['odendi'] && isset($fazlaMesai['odeme_tarihi'])): ?>
-            <div class="mb-3">
-                <label class="form-label">Ödeme Tarihi</label>
-                <input type="date" class="form-control" value="<?php echo $fazlaMesai['odeme_tarihi']; ?>" disabled>
-            </div>
-            <?php endif; ?>
-            
-            <div class="mb-3">
-                <label class="form-label">Açıklama</label>
-                <textarea class="form-control" name="aciklama" rows="3"><?php echo escape($fazlaMesai['aciklama'] ?? ''); ?></textarea>
-            </div>
-            
-            <div class="mt-3">
+            <div class="mt-3 d-flex gap-2">
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-save"></i> Güncelle
                 </button>

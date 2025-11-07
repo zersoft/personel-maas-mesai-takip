@@ -57,9 +57,6 @@ if (isset($_GET['error'])) {
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-people"></i> Personel Listesi</h1>
     <div class="d-flex gap-2">
-        <a href="personel_listesi.php?durum=silinmis" class="btn btn-outline-secondary">
-            <i class="bi bi-archive"></i> Silinen Personeller
-        </a>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personelEkleModal">
         <i class="bi bi-person-plus"></i> Yeni Personel Ekle
     </button>
@@ -70,13 +67,13 @@ if (isset($_GET['error'])) {
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3">
-            <div class="col-md-5">
+            <div class="col-md-6">
                 <label class="form-label">Ad Soyad Ara</label>
                 <input type="text" class="form-control" name="filtre_ad_soyad" 
                        value="<?php echo escape($filtre_ad_soyad); ?>" 
                        placeholder="Ad soyad ile ara...">
             </div>
-            <div class="col-md-5">
+            <div class="col-md-2">
                 <label class="form-label">Pozisyon</label>
                 <select class="form-select" name="filtre_pozisyon">
                     <option value="">Tüm Pozisyonlar</option>
@@ -106,7 +103,7 @@ if (isset($_GET['error'])) {
                 </button>
             </div>
             <?php if (!empty($filtre_ad_soyad) || !empty($filtre_pozisyon)): ?>
-            <div class="col-md-12">
+            <div class="col-md-2">
                 <a href="personel_listesi.php" class="btn btn-sm btn-secondary">
                     <i class="bi bi-x-circle"></i> Filtreleri Temizle
                 </a>
