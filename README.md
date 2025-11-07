@@ -367,7 +367,24 @@ chmod 755 storage/sessions/
 
 ## 📄 Lisans
 
-Bu proje özel kullanım için geliştirilmiştir.
+Bu proje ZERSOFT (zersoft.net) tarafından geliştirilmiştir ve telif haklarına tabidir.
+
+**Copyright (c) 2025 ZERSOFT**
+
+Bu yazılım, ZERSOFT'un özel mülkiyetidir ve yalnızca zersoft.net veya yetkili alt şirketleri tarafından iç iş kullanımı için lisanslanmıştır.
+
+### Lisans Koşulları
+
+- Bu yazılım yalnızca yetkili kullanıcılar tarafından kullanılabilir
+- Yazılımın kopyalanması, dağıtılması veya satılması yasaktır
+- Kaynak kodu değiştirilemez veya tersine mühendislik yapılamaz
+- Telif hakkı bildirimleri kaldırılamaz
+
+Detaylı lisans bilgileri için `LICENSE` dosyasına bakınız.
+
+**Lisans Sahibi**: ZERSOFT (zersoft.net)  
+**İletişim**: info@zersoft.net  
+**Web**: https://zersoft.net
 
 ---
 
