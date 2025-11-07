@@ -87,14 +87,19 @@ if (isset($_GET['error'])) {
                             </td>
                             <td><?php echo $u['son_giris'] ? date('d.m.Y H:i', strtotime($u['son_giris'])) : '-'; ?></td>
                             <td>
-                                <button class="btn btn-sm btn-warning" onclick="duzenleKullanici(<?php echo $u['id']; ?>)">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <?php if($u['id'] != $_SESSION['user_id']): ?>
-                                    <button class="btn btn-sm btn-danger" onclick="silKullanici(<?php echo $u['id']; ?>)">
-                                        <i class="bi bi-trash"></i>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button class="btn btn-warning" onclick="duzenleKullanici(<?php echo $u['id']; ?>)" title="Düzenle">
+                                        <i class="bi bi-pencil"></i>
                                     </button>
-                                <?php endif; ?>
+                                    <?php if($u['id'] != $_SESSION['user_id']): ?>
+                                        <button class="btn btn-danger" onclick="silKullanici(<?php echo $u['id']; ?>)" title="Sil">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    <?php endif; ?>
+                                    <a href="kullanici_loglari.php?user_id=<?php echo $u['id']; ?>" class="btn btn-info" title="Log Kayıtları">
+                                        <i class="bi bi-journal-text"></i>
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
