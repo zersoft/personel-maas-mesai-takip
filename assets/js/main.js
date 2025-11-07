@@ -137,11 +137,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function parseMoneyInput(value) {
         if (!value) return '0';
-        // Binlik ayraçlarını ve virgülü kaldır, noktayı virgüle çevir
-        let parsed = value.toString()
-            .replace(/\./g, '') // Binlik ayraçlarını kaldır
-            .replace(',', '.'); // Virgülü noktaya çevir (ondalık için)
-        return parsed;
+        let val = value.toString().trim().replace('₺','');
+        const hasComma = val.indexOf(',') !== -1;
+        const hasDot = val.indexOf('.') !== -1;
+        if (hasComma && hasDot) {
+            // Türkçe format: binlik nokta, ondalık virgül
+            val = val.replace(/\./g, '');
+            val = val.replace(',', '.');
+        } else if (hasComma) {
+            // Sadece virgül varsa: virgülü ondalık kabul et
+            val = val.replace(/\./g, '');
+            val = val.replace(',', '.');
+        } else if (hasDot) {
+            // Sadece nokta varsa: son noktayı ondalık kabul et, diğerlerini kaldır
+            const parts = val.split('.');
+            if (parts.length > 1) {
+                const last = parts.pop();
+                if (last.length <= 2) {
+                    val = parts.join('') + '.' + last;
+                } else {
+                    val = parts.join('') + last;
+                }
+            }
+        }
+        // Sadece rakam ve tek nokta bırak
+        val = val.replace(/[^0-9.]/g, '');
+        return val || '0';
     }
     
     // Tüm para alanlarına formatlama ekle
