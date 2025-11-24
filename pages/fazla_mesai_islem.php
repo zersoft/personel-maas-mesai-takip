@@ -94,11 +94,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $checkStmt = $pdo->query("SHOW COLUMNS FROM fazla_mesai LIKE 'updated_by'");
             $hasUpdatedBy = $checkStmt->rowCount() > 0;
         } catch(PDOException $e) {}
-        
+
+        // Tutar hesapla
+        $tutar = $saat * $saat_ucreti;
+
         if ($hasUpdatedBy) {
             $stmt = $pdo->prepare("
                 UPDATE fazla_mesai SET
-                    personel_id = ?, tarih = ?, saat = ?, saat_ucreti = ?, aciklama = ?, updated_by = ?
+                    personel_id = ?, tarih = ?, saat = ?, saat_ucreti = ?, tutar = ?, aciklama = ?, updated_by = ?
                 WHERE id = ?
             ");
             $stmt->execute([
@@ -106,6 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $tarih,
                 $saat,
                 $saat_ucreti,
+                $tutar,
                 $aciklama ?: null,
                 $userId,
                 $id
@@ -113,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         } else {
             $stmt = $pdo->prepare("
                 UPDATE fazla_mesai SET
-                    personel_id = ?, tarih = ?, saat = ?, saat_ucreti = ?, aciklama = ?
+                    personel_id = ?, tarih = ?, saat = ?, saat_ucreti = ?, tutar = ?, aciklama = ?
                 WHERE id = ?
             ");
             $stmt->execute([
@@ -121,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $tarih,
                 $saat,
                 $saat_ucreti,
+                $tutar,
                 $aciklama ?: null,
                 $id
             ]);
@@ -170,11 +175,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $checkStmt = $pdo->query("SHOW COLUMNS FROM fazla_mesai LIKE 'created_by'");
             $hasCreatedBy = $checkStmt->rowCount() > 0;
         } catch(PDOException $e) {}
-        
+
+        // Tutar hesapla
+        $tutar = $saat * $saat_ucreti;
+
         if ($hasCreatedBy) {
             $stmt = $pdo->prepare("
                 INSERT INTO fazla_mesai 
-                (personel_id, tarih, saat, saat_ucreti, aciklama, created_by) 
+                (personel_id, tarih, saat, saat_ucreti, tutar, aciklama, created_by) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $personel_id,
+                $tarih,
+                $saat,
+                $saat_ucreti,
+                $tutar,
+                $aciklama ?: null,
+                $userId
+            ]);
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO fazla_mesai 
+                (personel_id, tarih, saat, saat_ucreti, tutar, aciklama) 
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
@@ -182,20 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $tarih,
                 $saat,
                 $saat_ucreti,
-                $aciklama ?: null,
-                $userId
-            ]);
-        } else {
-            $stmt = $pdo->prepare("
-                INSERT INTO fazla_mesai 
-                (personel_id, tarih, saat, saat_ucreti, aciklama) 
-                VALUES (?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                $personel_id,
-                $tarih,
-                $saat,
-                $saat_ucreti,
+                $tutar,
                 $aciklama ?: null
             ]);
         }
@@ -224,7 +234,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         
         $pdo->beginTransaction();
-        $stmt = $pdo->prepare('INSERT INTO fazla_mesai (personel_id, tarih, saat, saat_ucreti, aciklama) VALUES (?,?,?,?,?)');
+        $stmt = $pdo->prepare('INSERT INTO fazla_mesai (personel_id, tarih, saat, saat_ucreti, tutar, aciklama) VALUES (?,?,?,?,?,?)');
         
         foreach ($items as $pid => $it) {
             if (!isset($it['dahil'])) continue;
@@ -238,7 +248,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $aciklama = $it['aciklama'] ?? null;
             
             if ($personel_id > 0 && $saat > 0) {
-                $stmt->execute([$personel_id, $tarih, $saat, $saat_ucreti, $aciklama]);
+                $tutar = $saat * $saat_ucreti;
+                $stmt->execute([$personel_id, $tarih, $saat, $saat_ucreti, $tutar, $aciklama]);
             }
         }
         
