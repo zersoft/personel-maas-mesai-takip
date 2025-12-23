@@ -20,3 +20,9 @@ tmp/
 # Migration files (keep SQL files but ignore after running)
 # migration_*.sql
 
+# Session files
+storage/sessions/sess_*
+
+# Composer vendor (optional - uncomment if you don't want to commit vendor)
+# vendor/
+

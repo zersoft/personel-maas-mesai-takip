@@ -55,6 +55,11 @@ include '../includes/header.php';
                 </a>
             <?php endif; ?>
         </form>
+        <?php if (!empty($avanslar)): ?>
+            <a href="avans_takip_pdf.php?ay=<?php echo $ay; ?>&yil=<?php echo $yil; ?><?php echo $personel_filtre > 0 ? '&personel_id=' . $personel_filtre : ''; ?>" class="btn btn-sm btn-danger" target="_blank">
+                <i class="bi bi-file-pdf"></i> PDF Rapor
+            </a>
+        <?php endif; ?>
         <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#avansEkleModal">
             <i class="bi bi-plus-circle"></i> Avans Ekle
         </button>
