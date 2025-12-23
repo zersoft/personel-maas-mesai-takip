@@ -1,13 +1,21 @@
 <?php
+// Output buffering başlat - PDF çıktısından önce hiçbir şey gönderilmemeli
+ob_start();
+
 require_once '../config/db.php';
 require_once '../includes/functions.php';
 require_once '../includes/auth.php';
 
 requireLogin();
 
+// Buffer'ı temizle - require'ların ürettiği tüm çıktıyı sil
+ob_end_clean();
+
 // TCPDF kütüphanesini yükle
 $vendorPath = __DIR__ . '/../vendor/autoload.php';
 if (!file_exists($vendorPath)) {
+    if (ob_get_level()) ob_end_clean();
+    header('Content-Type: text/html; charset=utf-8');
     die('TCPDF kütüphanesi bulunamadı. Lütfen "composer install" komutunu çalıştırın.');
 }
 require_once $vendorPath;
@@ -59,7 +67,9 @@ try {
         $toplam_genel += (float)$avans['toplam_avans'];
     }
 } catch(PDOException $e) {
-    die('Veritabanı hatası: ' . $e->getMessage());
+    if (ob_get_level()) ob_end_clean();
+    header('Content-Type: text/html; charset=utf-8');
+    die('Veritabanı hatası: ' . htmlspecialchars($e->getMessage()));
 }
 
 // PDF oluştur
