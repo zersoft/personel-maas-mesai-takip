@@ -85,9 +85,10 @@ class AvansTakipPDF extends TCPDF {
     public function Header() {
         $this->SetFont('dejavusans', 'B', 16);
         $this->Cell(0, 10, 'Avans Takip Raporu', 0, 1, 'C');
+        $this->SetFont('dejavusans', 'B', 12);
+        $this->Cell(0, 7, 'Dönem: ' . getTurkishMonthName($this->reportAy) . ' ' . $this->reportYil, 0, 1, 'C');
         $this->SetFont('dejavusans', '', 10);
-        $this->Cell(0, 5, getTurkishMonthName($this->reportAy) . ' ' . $this->reportYil, 0, 1, 'C');
-        $this->Ln(5);
+        $this->Ln(3);
     }
     
     public function Footer() {
