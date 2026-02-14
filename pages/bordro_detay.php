@@ -73,6 +73,27 @@ include '../includes/header.php';
                 </ul>
             </div>
         </div>
+        <div class="card mt-3">
+            <div class="card-header">Açıklamalar</div>
+            <div class="card-body py-2">
+                <div class="mb-2">
+                    <small class="text-muted d-block">Genel Açıklama</small>
+                    <?php if (!empty(trim((string)($b['aciklama'] ?? '')))): ?>
+                        <div class="small"><?php echo nl2br(escape($b['aciklama'])); ?></div>
+                    <?php else: ?>
+                        <div class="small text-muted">-</div>
+                    <?php endif; ?>
+                </div>
+                <div>
+                    <small class="text-muted d-block">Kesinti Açıklaması</small>
+                    <?php if (!empty(trim((string)($b['kesinti_aciklama'] ?? '')))): ?>
+                        <div class="small text-danger-emphasis"><?php echo nl2br(escape($b['kesinti_aciklama'])); ?></div>
+                    <?php else: ?>
+                        <div class="small text-muted">-</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
     </div>
     <div class="col-md-6">
         <div class="card">

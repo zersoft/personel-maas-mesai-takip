@@ -12,6 +12,8 @@ if ($yil < 2000 || $yil > 2100) $yil = date('Y');
 try {
     $stmt = $pdo->prepare("SELECT p.ad_soyad,
         COALESCE(b.brut_maas, 0) AS brut_maas,
+        COALESCE(b.aciklama, '') AS aciklama,
+        COALESCE(b.kesinti_aciklama, '') AS kesinti_aciklama,
         (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) AS kesinti_toplam,
         (COALESCE(b.banka_avans, a.banka_avans, 0) + COALESCE(b.nakit_avans, a.nakit_avans, 0)) AS avans_toplam,
         (COALESCE(b.ek_odenek_banka,0) + COALESCE(b.ek_odenek_nakit,0)) AS ilave_odeme_toplam,
@@ -87,51 +89,106 @@ include '../includes/header.php';
     margin-bottom: 0;
 }
 
+.notes-cell {
+    min-width: 120px;
+}
+
+.notes-wrap {
+    max-height: 30px;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 8px;
+    line-height: 1.15;
+}
+
+.note-item {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 1px 7px;
+    margin-right: 4px;
+    border: 1px solid transparent;
+    max-width: 105px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+
+.note-item-general {
+    background: #e0f2fe;
+    color: #075985;
+    border-color: #bae6fd;
+}
+
+.note-item-kesinti {
+    background: #fef2f2;
+    color: #991b1b;
+    border-color: #fecaca;
+}
+
 table#bordro-ozet-table td.personel-col,
 table#bordro-ozet-table th.personel-col {
     white-space: nowrap;
 }
 
 @media print {
-    @page { size: A4 landscape; margin: 8mm; }
-    .no-print, .navbar, .btn-close { display: none !important; }
+    @page { size: A4 landscape; margin: 6mm; }
+    .no-print, .navbar, .btn-close, footer { display: none !important; }
+    html, body { margin: 0 !important; padding: 0 !important; }
     .card { border: none !important; box-shadow: none !important; }
     .table { border-collapse: collapse !important; }
     .table th, .table td { border: 1px solid #000 !important; }
     a[href]:after { content: "" !important; }
     body { color: #000 !important; }
     .text-orange { color: #b45309 !important; }
-    .report-title { font-size: 1.6rem !important; }
-    .period-pill {
-        font-size: 0.72rem !important;
-        padding: 0.18rem 0.45rem !important;
+    /* Açıklama: çıktıda sadece metin rengi, ayrı container yok */
+    .note-item, .note-item-general, .note-item-kesinti {
+        background: none !important; border: none !important; border-radius: 0 !important;
+        padding: 0 !important; margin-right: 0.25em !important;
     }
-    .report-header { margin-bottom: 0.35rem !important; }
-    .card { margin-bottom: 0.4rem !important; }
-    .summary-card .card-body { padding: 0.45rem 0.6rem !important; }
-    .summary-card h6 { font-size: 0.8rem !important; margin-bottom: 0.1rem !important; }
-    .summary-card h4 { font-size: 1.1rem !important; margin-bottom: 0 !important; line-height: 1.1 !important; }
-    .summary-card .text-center.mt-3 { margin-top: 0.25rem !important; }
-    .summary-card .text-center.mt-3 small { font-size: 10px !important; }
-    body, .table { font-size: 10px !important; }
+    .note-item-general { color: #075985 !important; }
+    .note-item-kesinti { color: #991b1b !important; }
+    .report-title { font-size: 1.3rem !important; }
+    .period-pill {
+        font-size: 0.68rem !important;
+        padding: 0.12rem 0.35rem !important;
+    }
+    .report-header { margin-bottom: 0.2rem !important; }
+    .card { margin-bottom: 0.22rem !important; }
+    .summary-card .card-body { padding: 0.28rem 0.45rem !important; }
+    .summary-card h6 { font-size: 0.7rem !important; margin-bottom: 0 !important; }
+    .summary-card h4 { font-size: 0.92rem !important; margin-bottom: 0 !important; line-height: 1.05 !important; }
+    .summary-card .text-center.mt-3 { margin-top: 0.15rem !important; }
+    .summary-card .text-center.mt-3 small { font-size: 8.5px !important; }
+    body, .table { font-size: 8.8px !important; }
+    .notes-cell { min-width: 0 !important; }
+    .notes-wrap {
+        font-size: 6.5px !important;
+        max-height: 16px !important;
+    }
+    .note-item {
+        max-width: 58px !important;
+        padding: 0 3px !important;
+        margin-right: 2px !important;
+    }
     #bordro-ozet-table { width: 100% !important; table-layout: fixed !important; }
     #bordro-ozet-table th, #bordro-ozet-table td {
-        padding: 2px 4px !important;
-        line-height: 1.15 !important;
+        padding: 1px 2px !important;
+        line-height: 1.05 !important;
         vertical-align: middle !important;
     }
     #bordro-ozet-table th.personel-col, #bordro-ozet-table td.personel-col {
-        width: 22% !important;
+        width: 20% !important;
         white-space: nowrap !important;
-        font-size: 10.5px !important;
+        font-size: 8.8px !important;
     }
-    #bordro-ozet-table th.col-brut, #bordro-ozet-table td.col-brut { width: 13% !important; }
-    #bordro-ozet-table th.col-ilave, #bordro-ozet-table td.col-ilave { width: 10% !important; }
-    #bordro-ozet-table th.col-kesinti, #bordro-ozet-table td.col-kesinti { width: 10% !important; }
-    #bordro-ozet-table th.col-avans, #bordro-ozet-table td.col-avans { width: 10% !important; }
-    #bordro-ozet-table th.col-banka, #bordro-ozet-table td.col-banka { width: 11% !important; }
-    #bordro-ozet-table th.col-nakit, #bordro-ozet-table td.col-nakit { width: 11% !important; }
-    #bordro-ozet-table th.col-net, #bordro-ozet-table td.col-net { width: 13% !important; }
+    #bordro-ozet-table th.col-brut, #bordro-ozet-table td.col-brut { width: 12% !important; }
+    #bordro-ozet-table th.col-ilave, #bordro-ozet-table td.col-ilave { width: 8% !important; }
+    #bordro-ozet-table th.col-kesinti, #bordro-ozet-table td.col-kesinti { width: 8% !important; }
+    #bordro-ozet-table th.col-avans, #bordro-ozet-table td.col-avans { width: 8% !important; }
+    #bordro-ozet-table th.col-banka, #bordro-ozet-table td.col-banka { width: 9% !important; }
+    #bordro-ozet-table th.col-nakit, #bordro-ozet-table td.col-nakit { width: 9% !important; }
+    #bordro-ozet-table th.col-net, #bordro-ozet-table td.col-net { width: 12% !important; }
+    #bordro-ozet-table th.col-notes, #bordro-ozet-table td.col-notes { width: 10% !important; }
     /* Toplam özetini tek satır yap */
     .summary-inline { display: block !important; text-align: center !important; }
     .summary-inline .col-md-4 { display: inline-block !important; width: 32% !important; padding: 0 !important; margin: 0 !important; vertical-align: top !important; }
@@ -196,6 +253,7 @@ table#bordro-ozet-table th.personel-col {
                             <th class="personel-col">Personel</th>
                             <th class="money col-brut">Brüt</th>
                             <th class="money text-success col-ilave">İlave Ödeme</th>
+                            <th class="col-notes notes-cell">Açıklamalar</th>
                             <th class="money text-danger col-kesinti">Kesinti</th>
                             <th class="money text-orange col-avans">Avans</th>
                             <th class="money col-banka">Banka</th>
@@ -209,6 +267,23 @@ table#bordro-ozet-table th.personel-col {
                                 <td class="personel-col"><?php echo escape($r['ad_soyad']); ?></td>
                                 <td class="money col-brut"><?php echo formatMoney($r['brut_maas']); ?></td>
                                 <td class="money text-success col-ilave"><?php echo formatMoney($r['ilave_odeme_toplam']); ?></td>
+                                <td class="col-notes notes-cell">
+                                    <div class="notes-wrap">
+                                        <?php
+                                        $aciklama_t = trim((string)($r['aciklama'] ?? ''));
+                                        $kesinti_t = trim((string)($r['kesinti_aciklama'] ?? ''));
+                                        $maxLen = 50;
+                                        if ($aciklama_t !== ''): $show = mb_strlen($aciklama_t) > $maxLen ? mb_strimwidth($aciklama_t, 0, $maxLen, '..') : $aciklama_t; ?>
+                                            <span class="note-item note-item-general" title="Genel: <?php echo escape($r['aciklama']); ?>">Genel: <?php echo escape($show); ?></span>
+                                        <?php endif;
+                                        if ($kesinti_t !== ''): $show = mb_strlen($kesinti_t) > $maxLen ? mb_strimwidth($kesinti_t, 0, $maxLen, '..') : $kesinti_t; ?>
+                                            <span class="note-item note-item-kesinti" title="Kesinti: <?php echo escape($r['kesinti_aciklama']); ?>">Kesinti: <?php echo escape($show); ?></span>
+                                        <?php endif;
+                                        if ($aciklama_t === '' && $kesinti_t === ''): ?>
+                                            <span class="text-muted small">-</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
                                 <td class="money text-danger col-kesinti"><?php echo formatMoney($r['kesinti_toplam']); ?></td>
                                 <td class="money text-orange col-avans"><?php echo formatMoney($r['avans_toplam']); ?></td>
                                 <td class="money col-banka"><?php echo formatMoney($r['banka_pay']); ?></td>
@@ -222,6 +297,7 @@ table#bordro-ozet-table th.personel-col {
                             <th class="personel-col">Toplam</th>
                             <th class="money col-brut"><?php echo formatMoney($sumBrut); ?></th>
                             <th class="money text-success col-ilave"><?php echo formatMoney($sumIlave); ?></th>
+                            <th class="col-notes"></th>
                             <th class="money text-danger col-kesinti"><?php echo formatMoney($sumKesinti); ?></th>
                             <th class="money text-orange col-avans"><?php echo formatMoney($sumAvans); ?></th>
                             <th class="money col-banka"><?php echo formatMoney($sumBanka); ?></th>
