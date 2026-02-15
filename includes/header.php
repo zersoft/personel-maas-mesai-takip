@@ -41,6 +41,9 @@ $currentPage = basename($scriptPath);
                 <i class="bi bi-people-fill"></i> Personel Takip Sistemi
             </a>
             <div class="d-flex align-items-center">
+                <a class="text-white text-decoration-none me-3" href="#" title="Sürüm Notları" data-bs-toggle="modal" data-bs-target="#versionNotesModal">
+                    <i class="bi bi-journal-text"></i>
+                </a>
                 <?php if (isset($_SESSION['rol']) && $_SESSION['rol'] === 'admin'): ?>
                 <a class="text-white text-decoration-none me-3" href="<?php echo $menuPagesPath; ?>kullanici_yonetimi.php" title="Kullanıcı Yönetimi">
                     <i class="bi bi-gear"></i>
@@ -55,6 +58,7 @@ $currentPage = basename($scriptPath);
                         <li><a class="dropdown-item disabled"><small class="text-muted">@<?php echo htmlspecialchars($_SESSION['username'] ?? ''); ?></small></a></li>
                         <li><a class="dropdown-item disabled"><small class="text-muted"><?php echo ucfirst($_SESSION['rol'] ?? 'user'); ?></small></a></li>
                         <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionNotesModal"><i class="bi bi-journal-text"></i> Sürüm Notları</a></li>
                         <li><a class="dropdown-item" href="<?php echo $basePath; ?>logout.php"><i class="bi bi-box-arrow-right"></i> Çıkış Yap</a></li>
                     </ul>
                 </div>

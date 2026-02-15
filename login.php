@@ -29,6 +29,13 @@ if (file_exists($appConfigPath)) {
     $appVersion = defined('APP_VERSION') ? APP_VERSION : '2.0.0';
 }
 
+// Sürüm notları (modal için)
+$loginVersionNotes = [];
+$versionNotesPath = __DIR__ . '/config/version_notes.php';
+if (file_exists($versionNotesPath)) {
+    $loginVersionNotes = (array) require $versionNotesPath;
+}
+
 // Zaten giriş yapmışsa ana sayfaya yönlendir
 if (isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -152,13 +159,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="text-center mt-4">
                     <small class="text-muted">
                         © <?php echo date('Y'); ?> <a href="https://zersoft.net" target="_blank" class="text-decoration-none">ZERSOFT</a> Personel Takip Sistemi
-                        <span class="badge bg-secondary ms-2">v<?php echo $appVersion; ?></span>
+                        <a href="#" class="text-decoration-none ms-2" title="Sürüm notlarını görüntüle" data-bs-toggle="modal" data-bs-target="#versionNotesModal"><span class="badge bg-secondary">v<?php echo htmlspecialchars($appVersion); ?></span></a>
                     </small>
                 </div>
             </div>
         </div>
     </div>
-    
+
+    <!-- Sürüm Notları Modal (login sayfası) -->
+    <div class="modal fade" id="versionNotesModal" tabindex="-1" aria-labelledby="versionNotesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="versionNotesModalLabel">
+                        <i class="bi bi-journal-text"></i> Sürüm Notları
+                        <span class="badge bg-primary ms-2">v<?php echo htmlspecialchars($appVersion); ?></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+                <div class="modal-body">
+                    <?php if (empty($loginVersionNotes)): ?>
+                        <p class="text-muted mb-0">Henüz sürüm notu eklenmemiş.</p>
+                    <?php else: ?>
+                        <?php foreach ($loginVersionNotes as $release): ?>
+                            <?php
+                            $v = $release['version'];
+                            $title = isset($release['title']) ? $release['title'] : 'Sürüm ' . $v;
+                            $notes = isset($release['notes']) ? $release['notes'] : [];
+                            $dateFormatted = date('d.m.Y', strtotime($release['date']));
+                            ?>
+                            <div class="mb-4">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <span class="badge bg-secondary">v<?php echo htmlspecialchars($v); ?></span>
+                                    <strong><?php echo htmlspecialchars($title); ?></strong>
+                                    <small class="text-muted"><?php echo $dateFormatted; ?></small>
+                                </div>
+                                <?php if (!empty($notes)): ?>
+                                    <ul class="mb-0 ps-3 small">
+                                        <?php foreach ($notes as $note): ?>
+                                            <li class="mb-1"><?php echo htmlspecialchars($note); ?></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Kapat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
