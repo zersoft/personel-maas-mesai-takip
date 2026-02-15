@@ -11,6 +11,8 @@ $bitis = isset($_GET['bitis']) ? $_GET['bitis'] : date('Y-m-d');
 $personel_filtre = isset($_GET['personel_id']) ? (int)$_GET['personel_id'] : 0;
 $ay = isset($_GET['ay']) ? (int)$_GET['ay'] : (int)date('n');
 $yil = isset($_GET['yil']) ? (int)$_GET['yil'] : (int)date('Y');
+$bakiye_filtre = isset($_GET['bakiye_filtre']) ? (int)$_GET['bakiye_filtre'] : 0; // 0 = tümü, 1 = bakiyesizleri gizle
+$aktif_tab = (isset($_GET['tab']) && $_GET['tab'] === 'alacak') ? 'alacak' : 'kayitlar';
 
 // Filtrelenmiş FM listesi ve kümülatif toplamlar
 try {
@@ -130,6 +132,38 @@ try {
 } catch (PDOException $e) {
     $fazlaMesailer = [];
     $kumulatifToplamlar = [];
+}
+
+// Kalan FM alacakları (tüm dönem, filtre yok) – personel bazlı toplam FM, toplam ödeme, kalan alacak
+$kalanAlacaklar = [];
+try {
+    $sqlAlacak = "SELECT p.id, p.ad_soyad,
+                  COALESCE((SELECT SUM(fm.tutar) FROM fazla_mesai fm WHERE fm.personel_id = p.id), 0) AS toplam_fm,
+                  COALESCE((SELECT SUM(o.tutar) FROM fazla_mesai_odeme o WHERE o.personel_id = p.id), 0) AS toplam_odeme
+                  FROM personel_listesi p
+                  WHERE p.aktif = 1
+                  ORDER BY p.ad_soyad";
+    $stmtAlacak = $pdo->query($sqlAlacak);
+    while ($row = $stmtAlacak->fetch(PDO::FETCH_ASSOC)) {
+        $toplamFm = (float)$row['toplam_fm'];
+        $toplamOdeme = (float)$row['toplam_odeme'];
+        $bakiye = $toplamFm - $toplamOdeme;
+        $kalanAlacaklar[] = [
+            'id' => $row['id'],
+            'ad_soyad' => $row['ad_soyad'],
+            'toplam_fm' => $toplamFm,
+            'toplam_odeme' => $toplamOdeme,
+            'kalan_alacak' => $bakiye
+        ];
+    }
+} catch (PDOException $e) {
+    $kalanAlacaklar = [];
+}
+
+if ($bakiye_filtre === 1) {
+    $kalanAlacaklar = array_values(array_filter($kalanAlacaklar, function ($a) {
+        return (float)$a['kalan_alacak'] != 0;
+    }));
 }
 
 include '../includes/header.php';
@@ -266,7 +300,7 @@ if (isset($_GET['error'])) {
     <div class="card-body">
         <ul class="nav nav-tabs" id="fmTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="kayitlar-tab" data-bs-toggle="tab" data-bs-target="#kayitlar" type="button" role="tab">
+                <button class="nav-link <?php echo $aktif_tab === 'kayitlar' ? 'active' : ''; ?>" id="kayitlar-tab" data-bs-toggle="tab" data-bs-target="#kayitlar" type="button" role="tab">
                     <i class="bi bi-list-ul"></i> Fazla Mesai Kayıtları
                 </button>
             </li>
@@ -275,11 +309,16 @@ if (isset($_GET['error'])) {
                     <i class="bi bi-calculator"></i> Kümülatif Toplamlar
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link <?php echo $aktif_tab === 'alacak' ? 'active' : ''; ?>" id="alacak-tab" data-bs-toggle="tab" data-bs-target="#alacak" type="button" role="tab">
+                    <i class="bi bi-wallet2"></i> Kalan FM Alacakları
+                </button>
+            </li>
         </ul>
 
         <div class="tab-content pt-3" id="fmTabContent">
             <!-- Tab 1: Fazla Mesai Kayıtları -->
-            <div class="tab-pane fade show active" id="kayitlar" role="tabpanel">
+            <div class="tab-pane fade <?php echo $aktif_tab === 'kayitlar' ? 'show active' : ''; ?>" id="kayitlar" role="tabpanel">
                 <?php if (empty($fazlaMesailer)): ?>
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle"></i> Henüz fazla mesai kaydı bulunmamaktadır.
@@ -335,6 +374,69 @@ if (isset($_GET['error'])) {
                             </tfoot>
                         </table>
                     </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Kalan FM Alacakları Tab (tüm dönem, filtre yok) -->
+            <div class="tab-pane fade <?php echo $aktif_tab === 'alacak' ? 'show active' : ''; ?>" id="alacak" role="tabpanel">
+                <?php
+                $alacakQuery = ['bakiye_filtre' => $bakiye_filtre];
+                $alacakPdfUrl = 'fazla_mesai_alacak_pdf.php?' . http_build_query($alacakQuery);
+                $alacakPageUrl = 'fazla_mesai.php?' . http_build_query(array_merge($_GET, ['bakiye_filtre' => 1, 'tab' => 'alacak']));
+                $alacakPageUrlTum = 'fazla_mesai.php?' . http_build_query(array_merge($_GET, ['bakiye_filtre' => 0, 'tab' => 'alacak']));
+                ?>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <p class="text-muted small mb-0"><i class="bi bi-info-circle"></i> Tüm dönemler – tarih/personel filtresi uygulanmaz. Toplam FM, toplam ödeme ve kalan alacak personel bazında gösterilir.</p>
+                    <div class="d-flex align-items-center gap-2 ms-auto">
+                        <span class="text-muted small">Bakiyesizleri:</span>
+                        <?php if ($bakiye_filtre === 1): ?>
+                            <a href="<?php echo escape($alacakPageUrlTum); ?>" class="btn btn-sm btn-outline-secondary">Göster</a>
+                            <span class="btn btn-sm btn-primary">Gizle</span>
+                        <?php else: ?>
+                            <span class="btn btn-sm btn-primary">Göster</span>
+                            <a href="<?php echo escape($alacakPageUrl); ?>" class="btn btn-sm btn-outline-secondary">Gizle</a>
+                        <?php endif; ?>
+                        <a href="<?php echo escape($alacakPdfUrl); ?>" target="_blank" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-file-earmark-pdf"></i> PDF İndir
+                        </a>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Personel</th>
+                                <th class="text-end">Toplam FM (₺)</th>
+                                <th class="text-end">Toplam Ödeme (₺)</th>
+                                <th class="text-end">Kalan Alacak (₺)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($kalanAlacaklar as $a): ?>
+                            <tr>
+                                <td><?php echo escape($a['ad_soyad']); ?></td>
+                                <td class="text-end"><?php echo number_format($a['toplam_fm'], 2, ',', '.'); ?></td>
+                                <td class="text-end"><?php echo number_format($a['toplam_odeme'], 2, ',', '.'); ?></td>
+                                <td class="text-end fw-bold <?php echo $a['kalan_alacak'] > 0 ? 'text-success' : ($a['kalan_alacak'] < 0 ? 'text-danger' : ''); ?>">
+                                    <?php echo number_format($a['kalan_alacak'], 2, ',', '.'); ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <?php if (!empty($kalanAlacaklar)): ?>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th>Toplam</th>
+                                <th class="text-end"><?php echo number_format(array_sum(array_column($kalanAlacaklar, 'toplam_fm')), 2, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format(array_sum(array_column($kalanAlacaklar, 'toplam_odeme')), 2, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format(array_sum(array_column($kalanAlacaklar, 'kalan_alacak')), 2, ',', '.'); ?></th>
+                            </tr>
+                        </tfoot>
+                        <?php endif; ?>
+                    </table>
+                </div>
+                <?php if (empty($kalanAlacaklar)): ?>
+                <p class="text-muted">Aktif personel bulunamadı.</p>
                 <?php endif; ?>
             </div>
 
