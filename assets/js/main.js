@@ -1,4 +1,4 @@
-// Personel Takip Sistemi - Ana JavaScript Dosyası
+// OYS - Ocak Yönetim Sistemi - Ana JavaScript Dosyası
 
 // Personel işlemleri
 function duzenlePersonel(id) {
@@ -90,7 +90,7 @@ function silTazminat(id) {
 
 // Fazla mesai sayfasında personel seçildiğinde saat ücretini otomatik doldur
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Personel Takip Sistemi yüklendi');
+    console.log('OYS - Ocak Yönetim Sistemi yüklendi');
     
     // Fazla mesai modalında personel seçimi
     const personelSelect = document.querySelector('select[name="personel_id"]');

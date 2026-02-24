@@ -83,7 +83,7 @@ class OzetRaporPDF extends TCPDF {
 }
 
 $pdf = new OzetRaporPDF('P', PDF_UNIT, 'A4', true, 'UTF-8', false);
-$pdf->SetCreator('Personel Takip Sistemi');
+$pdf->SetCreator('OYS - Ocak Yönetim Sistemi');
 $pdf->SetAuthor('ZERSOFT');
 $pdf->SetTitle('Özet Rapor - ' . $baslangic . '_' . $bitis);
 $pdf->SetMargins(12, 18, 12);

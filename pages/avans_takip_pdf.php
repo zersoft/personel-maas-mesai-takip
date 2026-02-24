@@ -101,7 +101,7 @@ class AvansTakipPDF extends TCPDF {
 
 $pdf = new AvansTakipPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
 $pdf->setReportPeriod($ay, $yil);
-$pdf->SetCreator('Personel Takip Sistemi');
+$pdf->SetCreator('OYS - Ocak Yönetim Sistemi');
 $pdf->SetAuthor('ZERSOFT');
 $pdf->SetTitle('Avans Takip Raporu');
 $pdf->SetSubject('Avans Takip Raporu');

@@ -36,14 +36,12 @@ $tarihBit = str_replace('-', '', $bitis) . '999999';
 try {
     $sql = "SELECT COALESCE(NULLIF(TRIM(dokumTipi),''), '-') AS malzeme,
             SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih >= ? AND tarih <= ? THEN COALESCE(dokumNetKg,0) ELSE 0 END) AS donem_net_kg,
-            SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih >= ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS donem_tutar,
-            SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih <= ? THEN COALESCE(dokumNetKg,0) ELSE 0 END) AS genel_net_kg,
-            SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS genel_tutar
+            SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih >= ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS donem_tutar
             FROM SahadanSatis
-            WHERE status = 1 AND tarih <= ?
+            WHERE status = 1 AND tarih BETWEEN ? AND ?
             GROUP BY COALESCE(NULLIF(TRIM(dokumTipi),''), '-') ORDER BY malzeme";
     $stmt = $pdoReport->prepare($sql);
-    $stmt->execute([$tarihBas, $tarihBit, $tarihBas, $tarihBit, $tarihBit, $tarihBit, $tarihBit]);
+    $stmt->execute([$tarihBas, $tarihBit, $tarihBas, $tarihBit, $tarihBas, $tarihBit]);
     $ozetMalzemeListe = $stmt->fetchAll(PDO::FETCH_ASSOC);
     if ($malzeme_bos_gizle === 0) {
         $ozetMalzemeListe = array_values(array_filter($ozetMalzemeListe, function ($m) {
@@ -55,13 +53,15 @@ try {
     die('Veritabanı hatası: ' . htmlspecialchars($e->getMessage()));
 }
 
-$sumDonemKg = $sumDonemTutar = $sumGenelKg = $sumGenelTutar = 0;
+$sumDonemKg = $sumDonemTutar = 0;
 foreach ($ozetMalzemeListe as $m) {
     $sumDonemKg += (float)($m['donem_net_kg'] ?? 0);
     $sumDonemTutar += (float)($m['donem_tutar'] ?? 0);
-    $sumGenelKg += (float)($m['genel_net_kg'] ?? 0);
-    $sumGenelTutar += (float)($m['genel_tutar'] ?? 0);
 }
+foreach ($ozetMalzemeListe as &$m) {
+    $m['oran'] = $sumDonemKg > 0 ? ((float)($m['donem_net_kg'] ?? 0) / $sumDonemKg) * 100 : 0;
+}
+unset($m);
 
 class OzetMalzemePDF extends TCPDF {
     public function Header() {
@@ -79,7 +79,7 @@ class OzetMalzemePDF extends TCPDF {
 }
 
 $pdf = new OzetMalzemePDF('P', PDF_UNIT, 'A4', true, 'UTF-8', false);
-$pdf->SetCreator('Personel Takip Sistemi');
+$pdf->SetCreator('OYS - Ocak Yönetim Sistemi');
 $pdf->SetAuthor('ZERSOFT');
 $pdf->SetTitle('Özet Malzeme Satış - ' . $baslangic . '_' . $bitis);
 $pdf->SetMargins(12, 18, 12);
@@ -92,8 +92,8 @@ $pdf->AddPage();
 $pdf->Cell(0, 5, 'Dönem: ' . $baslangic . ' – ' . $bitis . ($malzeme_bos_gizle === 0 ? ' (dönemde satışı olmayanlar gizli)' : ' (tüm malzemeler)'), 0, 1, 'L');
 $pdf->Ln(2);
 
-$colW = [60, 28, 32, 28, 32];
-$headers = ['Malzeme', 'Dönem Net (kg)', 'Dönem Tutar (₺)', 'Genel Net (kg)', 'Genel Tutar (₺)'];
+$colW = [70, 32, 36, 24];
+$headers = ['Malzeme', 'Dönem Net (kg)', 'Dönem Tutar (₺)', 'Oran (%)'];
 $pdf->SetFillColor(230, 230, 230);
 $pdf->SetFont('dejavusans', 'B', 8);
 foreach ($headers as $i => $h) {
@@ -103,11 +103,10 @@ $pdf->Ln();
 $pdf->SetFont('dejavusans', '', 8);
 $fill = false;
 foreach ($ozetMalzemeListe as $m) {
-    $pdf->Cell($colW[0], 6, mb_substr($m['malzeme'] ?? '-', 0, 38), 1, 0, 'L', $fill);
+    $pdf->Cell($colW[0], 6, mb_substr($m['malzeme'] ?? '-', 0, 45), 1, 0, 'L', $fill);
     $pdf->Cell($colW[1], 6, number_format((float)($m['donem_net_kg'] ?? 0), 0, ',', '.'), 1, 0, 'R', $fill);
     $pdf->Cell($colW[2], 6, number_format((float)($m['donem_tutar'] ?? 0), 2, ',', '.'), 1, 0, 'R', $fill);
-    $pdf->Cell($colW[3], 6, number_format((float)($m['genel_net_kg'] ?? 0), 0, ',', '.'), 1, 0, 'R', $fill);
-    $pdf->Cell($colW[4], 6, number_format((float)($m['genel_tutar'] ?? 0), 2, ',', '.'), 1, 1, 'R', $fill);
+    $pdf->Cell($colW[3], 6, number_format((float)($m['oran'] ?? 0), 1, ',', '.') . '%', 1, 1, 'R', $fill);
     $fill = !$fill;
 }
 
@@ -117,13 +116,12 @@ if (!empty($ozetMalzemeListe)) {
     $pdf->Cell($colW[0], 7, 'Toplam', 1, 0, 'L', true);
     $pdf->Cell($colW[1], 7, number_format($sumDonemKg, 0, ',', '.'), 1, 0, 'R', true);
     $pdf->Cell($colW[2], 7, number_format($sumDonemTutar, 2, ',', '.'), 1, 0, 'R', true);
-    $pdf->Cell($colW[3], 7, number_format($sumGenelKg, 0, ',', '.'), 1, 0, 'R', true);
-    $pdf->Cell($colW[4], 7, number_format($sumGenelTutar, 2, ',', '.'), 1, 1, 'R', true);
+    $pdf->Cell($colW[3], 7, '100%', 1, 1, 'R', true);
 }
 
 $pdf->Ln(2);
 $pdf->SetFont('dejavusans', 'I', 7);
-$pdf->Cell(0, 4, 'Sadece satış (TAHAKKUK) hareketleri. Dönem: seçili tarih aralığı. Genel: baştan son tarihe kadar.', 0, 1, 'L');
+$pdf->Cell(0, 4, 'Sadece satış (TAHAKKUK) hareketleri. Oran: seçili dönemdeki toplam miktara (kg) göre pay.', 0, 1, 'L');
 
 $pdf->Output('ozet_malzeme_satis_' . $baslangic . '_' . $bitis . '.pdf', 'I');
 exit;

@@ -88,7 +88,7 @@ class FazlaMesaiAlacakPDF extends TCPDF {
 
 $pdf = new FazlaMesaiAlacakPDF('P', PDF_UNIT, 'A4', true, 'UTF-8', false);
 $pdf->setBakiyeFiltre($bakiye_filtre);
-$pdf->SetCreator('Personel Takip Sistemi');
+$pdf->SetCreator('OYS - Ocak Yönetim Sistemi');
 $pdf->SetAuthor('ZERSOFT');
 $pdf->SetTitle('Kalan FM Alacakları');
 $pdf->SetSubject('Kalan Fazla Mesai Alacakları');

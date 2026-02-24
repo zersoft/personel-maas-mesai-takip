@@ -104,7 +104,7 @@ class BordroOdemeOzetiPDF extends TCPDF {
 
 $pdf = new BordroOdemeOzetiPDF('L', PDF_UNIT, 'A4', true, 'UTF-8', false);
 $pdf->setReportPeriod($ay, $yil);
-$pdf->SetCreator('Personel Takip Sistemi');
+$pdf->SetCreator('OYS - Ocak Yönetim Sistemi');
 $pdf->SetAuthor('ZERSOFT');
 $pdf->SetTitle('Bordro Odeme Ozeti - ' . getTurkishMonthName($ay) . ' ' . $yil);
 $pdf->SetSubject('Bordro odeme ozeti');

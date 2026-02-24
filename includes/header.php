@@ -22,13 +22,18 @@ $menuPagesPath = $isInPages ? '' : 'pages/';
 
 // Aktif sayfa belirleme (vurgulama için)
 $currentPage = basename($scriptPath);
+if (!defined('APP_SHORT_NAME')) {
+    $appConfigPath = __DIR__ . '/../config/app.php';
+    if (file_exists($appConfigPath)) require_once $appConfigPath;
+    if (!defined('APP_SHORT_NAME')) { define('APP_SHORT_NAME', 'OYS'); define('APP_NAME', 'Ocak Yönetim Sistemi'); }
+}
 ?>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo isset($pageTitle) ? $pageTitle : 'Personel Takip Sistemi'; ?></title>
+    <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' . APP_SHORT_NAME : APP_SHORT_NAME . ' - ' . APP_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="<?php echo $basePath; ?>assets/css/style.css">
@@ -37,8 +42,8 @@ $currentPage = basename($scriptPath);
     <!-- Üst Bar: Uygulama Adı ve Kullanıcı Bilgileri -->
     <nav class="navbar navbar-dark bg-primary py-2" style="min-height: 50px;">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="<?php echo $basePath; ?>index.php" style="font-size: 1.25rem;">
-                <i class="bi bi-people-fill"></i> Personel Takip Sistemi
+            <a class="navbar-brand fw-bold" href="<?php echo $basePath; ?>index.php" style="font-size: 1.25rem;" title="<?php echo htmlspecialchars(APP_NAME); ?>">
+                <i class="bi bi-layers"></i> <?php echo htmlspecialchars(APP_SHORT_NAME); ?>
             </a>
             <div class="d-flex align-items-center">
                 <a class="text-white text-decoration-none me-3" href="#" title="Sürüm Notları" data-bs-toggle="modal" data-bs-target="#versionNotesModal">

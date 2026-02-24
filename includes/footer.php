@@ -15,6 +15,7 @@
     if (file_exists($versionNotesPath)) {
         $footerVersionNotes = (array) require $versionNotesPath;
     }
+    $footerAppName = defined('APP_NAME') ? APP_NAME : 'OYS - Ocak Yönetim Sistemi';
     ?>
 
     <!-- Sürüm Notları Modal -->
@@ -69,7 +70,7 @@
             <p class="mb-0 text-muted">
                 &copy; <?php echo date('Y'); ?> 
                 <a class="text-dark" href="https://zersoft.net" target="_blank">ZERSOFT</a> 
-                Personel Takip Sistemi. Tüm hakları saklıdır.
+                <?php echo htmlspecialchars($footerAppName); ?>. Tüm hakları saklıdır.
                 <a href="#" class="text-decoration-none" title="Sürüm notlarını görüntüle" data-bs-toggle="modal" data-bs-target="#versionNotesModal">
                     <span class="badge bg-secondary">v<?php echo htmlspecialchars($footerVersion); ?></span>
                 </a>

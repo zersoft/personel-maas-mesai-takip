@@ -1,8 +1,10 @@
-# Personel Maaş & Fazla Mesai Takip Sistemi
+# OYS – Ocak Yönetim Sistemi
+
+**OYS** (Ocak Yönetim Sistemi), taş ocağı ve agrega üretimi yapan işletmeler için tek platformda **personel**, **kantar**, **araç**, **yakıt**, **makine tamir-bakım**, **agrega üretim** ve **orman raporları** gibi tüm yönetim süreçlerini kapsamayı hedefleyen web tabanlı bir yönetim sistemidir. Farklı ebatlarda taş ve taş tozu üretiminin takibi de bu çatı altında planlanmaktadır.
 
 ## 📋 Genel Bakış
 
-Bu sistem, Excel tabanlı personel maaş ve fazla mesai takip işlemlerini web tabanlı bir uygulamaya dönüştürmek için geliştirilmiştir. Sistem, personel bordroları, fazla mesai takibi, avans ve tazminat yönetimini tek bir platformda toplar. Kullanıcı giriş sistemi, rol tabanlı yetkilendirme ve kapsamlı audit log sistemi ile güvenli bir yapı sunar.
+Sistem, başta personel maaş ve fazla mesai takibi olmak üzere Excel tabanlı süreçleri web tabanlı bir uygulamaya taşımak için geliştirilmiştir. Personel bordroları, fazla mesai, avans, tazminat ve **Kantar Raporları** (perakende satış, özet rapor, özet malzeme satış, cari ekstre) tek platformda toplanır. Kullanıcı girişi, rol tabanlı yetkilendirme ve audit log ile güvenli bir yapı sunar.
 
 ## 🎯 Mevcut Özellikler
 
@@ -83,6 +85,14 @@ Bu sistem, Excel tabanlı personel maaş ve fazla mesai takip işlemlerini web t
    - Personel bazlı bordro dağılımı
    - Ay ve yıl bazlı filtreleme
 
+#### 9. **Kantar Raporları** (Taş Ocağı / Agrega Satış)
+   - **Perakende Satış**: Tarih aralığına göre satış ve tahsilat hareketleri, müşteri/plaka filtresi, PDF export
+   - **Özet Rapor**: Müşteri bazlı toplam satış, tahsilat ve bakiye (dönem + genel), bakiyesizleri gizle/göster, PDF
+   - **Özet Malzeme Satış**: Malzeme (döküm tipi) bazında kg ve tutar özeti, dönemde satışı olmayanları gizle/göster, PDF
+   - **Cari Ekstre**: Müşteri cari hesap ekstresi (devir, hareketler, kümülatif bakiye), Select2 ile aranabilir müşteri seçimi, PDF
+   - Periyot seçenekleri: Bugün, Bu Hafta, Bu Ay, Bu Yıl; varsayılan tarih aralığı bugün
+   - Raporlama veritabanı (SahadanSatis) için ayrı bağlantı (.env `DB_REPORT_*`) desteklenir
+
 ## 🔧 Teknik Gereksinimler
 
 ### Sunucu Gereksinimleri
@@ -93,9 +103,10 @@ Bu sistem, Excel tabanlı personel maaş ve fazla mesai takip işlemlerini web t
 - **Session Desteği**: Aktif olmalı
 
 ### Veritabanı
-- **Veritabanı Adı**: `zersoftn_personel_takip` (veya özel ad)
+- **Ana veritabanı**: Personel, bordro, puantaj, fazla mesai, avans, tazminat (örn. `zersoftn_personel_takip`)
+- **Raporlama veritabanı** (isteğe bağlı): Kantar / SahadanSatis verileri için ayrı DB (`.env` içinde `DB_REPORT_*`)
 - **Karakter Seti**: UTF8MB4
-- **Tablo Sayısı**: 10+ ana tablo
+- **Tablo Sayısı**: 10+ ana tablo (ana DB); Kantar modülü için harici raporlama DB kullanılabilir
 
 ## 📦 Kurulum
 
@@ -139,13 +150,23 @@ migration_user_system.sql
 ```
 
 ### 3. Veritabanı Bağlantı Ayarları
-`config/db.php` dosyasını düzenleyin:
-```php
-$host = 'localhost'; // veya cPanel'de belirtilen host
-$dbname = 'cpanel_kullaniciadi_personel_takip'; // cPanel veritabanı adı
-$username = 'cpanel_kullaniciadi_dbuser'; // cPanel veritabanı kullanıcı adı
-$password = 'VERITABANI_SIFRESI'; // Veritabanı şifresi
+`.env` dosyasını proje kökünde oluşturup (örnek için `.env.example` kullanın) aşağıdakileri ayarlayın:
+
+```env
+# Ana veritabanı (personel, bordro, puantaj, vb.)
+DB_HOST=localhost
+DB_NAME=veritabani_adi
+DB_USER=kullanici
+DB_PASS=sifre
+
+# Raporlama veritabanı (Kantar Raporları – SahadanSatis)
+DB_REPORT_HOST=localhost
+DB_REPORT_NAME=rapor_db_adi
+DB_REPORT_USER=rapor_user
+DB_REPORT_PASS=rapor_sifre
 ```
+
+`config/db.php` ve `config/load_env.php` bu değişkenleri kullanır. Kantar Raporları kullanılmayacaksa raporlama DB bilgileri boş bırakılabilir.
 
 ### 4. Session Klasörü
 ```bash
@@ -296,6 +317,13 @@ chmod 755 storage/sessions/
 4. Personel, tarih, durum ve saat bilgilerini girin
 5. Kaydedin
 
+### Kantar Raporları (Taş Ocağı / Agrega)
+1. **Kantar Raporları** menüsüne gidin
+2. Sekmeyi seçin: **Perakende Satış**, **Özet Rapor**, **Özet Malzeme Satış** veya **Cari Ekstre**
+3. Periyot (Bugün, Bu Hafta, Bu Ay, Bu Yıl) veya özel başlangıç/bitiş tarihi seçin
+4. Perakende’de müşteri/plaka ile filtreleyebilir; Cari’de Select2 ile müşteri arayıp seçebilirsiniz
+5. **Uygula** ile listeyi güncelleyin; **PDF** ile raporu indirin
+
 ### Kullanıcı Log Görüntüleme (Admin)
 1. **Kullanıcı Yönetimi** sayfasına gidin (üst menüdeki ayarlar ikonu)
 2. İlgili kullanıcının **Log Kayıtları** butonuna tıklayın
@@ -327,6 +355,15 @@ chmod 755 storage/sessions/
 
 ## 🔄 Güncelleme Notları
 
+### Versiyon 2.0.x – OYS (Ocak Yönetim Sistemi)
+- ✅ Uygulama adı **OYS – Ocak Yönetim Sistemi** olarak güncellendi (taş ocağı / agrega üretimi odağı)
+- ✅ **Kantar Raporları** modülü: Perakende Satış, Özet Rapor, Özet Malzeme Satış, Cari Ekstre sekmeleri
+- ✅ Kantar PDF’leri: perakende, özet, özet malzeme, cari ekstre (TCPDF)
+- ✅ Özet malzeme satış: döküm tipi (malzeme) bazında kg/tutar, dönemde satışı olmayanları gizle/göster
+- ✅ Cari ekstre müşteri seçimi Select2 ile aranabilir
+- ✅ Tarih aralığı varsayılanı bugün; periyot butonlarında seçili vurgusu
+- ✅ Veritabanı ayarları `.env` ve `config/load_env.php` ile yönetiliyor; raporlama DB ayrı tanımlanabiliyor
+
 ### Versiyon 2.0.0 (Ocak 2025)
 - ✅ Kullanıcı giriş sistemi ve yetkilendirme eklendi
 - ✅ Audit log sistemi eklendi
@@ -336,7 +373,7 @@ chmod 755 storage/sessions/
 - ✅ Soft delete özelliği eklendi
 - ✅ Tüm işlem sayfaları güvenlik güncellemeleri yapıldı
 - ✅ Kullanıcı log görüntüleme özelliği eklendi
-- ✅ PDF/Yazdır desteği eklendi (Bordro Ödeme Özeti, Fazla Mesai Ekstresi, vb.)
+- ✅ PDF/Yazdır desteği eklendi (Bordro Ödeme Özeti, Fazla Mesai Ekstresi, Kantar Raporları, vb.)
 - ✅ Gelişmiş filtreleme özellikleri eklendi
 - ✅ Responsive tasarım iyileştirmeleri
 
@@ -345,10 +382,11 @@ chmod 755 storage/sessions/
 ### Geliştirme Notları
 - Sistem PHP PDO kullanıyor
 - Bootstrap 5 ile responsive tasarım
-- Bootstrap Icons kullanılıyor
+- Bootstrap Icons kullanılıyor (OYS simgesi: `bi-layers` – agrega/katman teması)
 - Türkçe karakter desteği mevcut (UTF8MB4)
 - Session yönetimi uygulama bazlı dizinde
 - Güvenli redirect fonksiyonu (`safeRedirect`)
+- Kantar Raporları: TCPDF ile PDF; jQuery + Select2 (Cari müşteri seçimi)
 
 ### Teknik Detaylar
 - **Para Parsing**: `parseMoney()` fonksiyonu TR/EN format desteği
@@ -367,7 +405,7 @@ chmod 755 storage/sessions/
 
 ## 📄 Lisans
 
-Bu proje ZERSOFT (zersoft.net) tarafından geliştirilmiştir ve telif haklarına tabidir.
+OYS – Ocak Yönetim Sistemi, ZERSOFT (zersoft.net) tarafından geliştirilmiştir ve telif haklarına tabidir.
 
 **Copyright (c) 2025 ZERSOFT**
 
@@ -388,6 +426,6 @@ Detaylı lisans bilgileri için `LICENSE` dosyasına bakınız.
 
 ---
 
-**Son Güncelleme**: Ocak 2025  
-**Versiyon**: 2.0.0  
+**Son Güncelleme**: Şubat 2025  
+**Versiyon**: 2.0.3 (OYS)  
 **Geliştirici**: ZERSOFT

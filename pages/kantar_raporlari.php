@@ -120,17 +120,15 @@ if ($pdoReport) {
                 }));
             }
         } elseif ($rapor === 'ozet_malzeme') {
-            // Malzeme (dokumTipi) bazında özet: sadece satış (GELİR TAHAKKUK), kg + tutar
+            // Malzeme (dokumTipi) bazında özet: sadece dönem satış (GELİR TAHAKKUK), kg + tutar
             $sql = "SELECT COALESCE(NULLIF(TRIM(dokumTipi),''), '-') AS malzeme,
                     SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih >= ? AND tarih <= ? THEN COALESCE(dokumNetKg,0) ELSE 0 END) AS donem_net_kg,
-                    SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih >= ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS donem_tutar,
-                    SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih <= ? THEN COALESCE(dokumNetKg,0) ELSE 0 END) AS genel_net_kg,
-                    SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS genel_tutar
+                    SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih >= ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS donem_tutar
                     FROM SahadanSatis
-                    WHERE status = 1 AND tarih <= ?
+                    WHERE status = 1 AND tarih BETWEEN ? AND ?
                     GROUP BY COALESCE(NULLIF(TRIM(dokumTipi),''), '-') ORDER BY malzeme";
             $stmt = $pdoReport->prepare($sql);
-            $stmt->execute([$tarihBas, $tarihBit, $tarihBas, $tarihBit, $tarihBit, $tarihBit, $tarihBit]);
+            $stmt->execute([$tarihBas, $tarihBit, $tarihBas, $tarihBit, $tarihBas, $tarihBit]);
             $ozetMalzemeListe = $stmt->fetchAll(PDO::FETCH_ASSOC);
             if ($malzeme_bos_gizle === 0) {
                 $ozetMalzemeListe = array_values(array_filter($ozetMalzemeListe, function ($m) {
@@ -400,13 +398,15 @@ include __DIR__ . '/../includes/header.php';
         $malzemeQuery = ['rapor' => 'ozet_malzeme', 'baslangic' => $baslangic, 'bitis' => $bitis];
         $malzemeUrlGoster = '?' . http_build_query(array_merge($malzemeQuery, ['malzeme_bos_gizle' => 1]));
         $malzemeUrlGizle  = '?' . http_build_query(array_merge($malzemeQuery, ['malzeme_bos_gizle' => 0]));
-        $sumDonemKg = $sumDonemTutar = $sumGenelKg = $sumGenelTutar = 0;
+        $sumDonemKg = $sumDonemTutar = 0;
         foreach ($ozetMalzemeListe as $m) {
             $sumDonemKg += (float)($m['donem_net_kg'] ?? 0);
             $sumDonemTutar += (float)($m['donem_tutar'] ?? 0);
-            $sumGenelKg += (float)($m['genel_net_kg'] ?? 0);
-            $sumGenelTutar += (float)($m['genel_tutar'] ?? 0);
         }
+        foreach ($ozetMalzemeListe as &$m) {
+            $m['oran'] = $sumDonemKg > 0 ? ((float)($m['donem_net_kg'] ?? 0) / $sumDonemKg) * 100 : 0;
+        }
+        unset($m);
         ?>
         <div class="card shadow-sm">
             <div class="card-body">
@@ -421,7 +421,7 @@ include __DIR__ . '/../includes/header.php';
                         <a href="<?php echo htmlspecialchars($malzemeUrlGoster); ?>" class="btn btn-sm btn-outline-secondary">Göster</a>
                     <?php endif; ?>
                 </div>
-                <p class="text-muted small">Sadece satış (TAHAKKUK) hareketleri. Dönem: <?php echo htmlspecialchars($baslangic); ?> – <?php echo htmlspecialchars($bitis); ?>. Genel: baştan son tarihe kadar. <?php if ($malzeme_bos_gizle === 0): ?>Seçili dönemde satışı olmayan malzemeler gizlenmiştir.<?php endif; ?></p>
+                <p class="text-muted small">Sadece satış (TAHAKKUK) hareketleri. Dönem: <?php echo htmlspecialchars($baslangic); ?> – <?php echo htmlspecialchars($bitis); ?>. Oran: seçili dönemdeki toplam miktara (kg) göre pay. <?php if ($malzeme_bos_gizle === 0): ?>Seçili dönemde satışı olmayan malzemeler gizlenmiştir.<?php endif; ?></p>
                 <div class="table-responsive">
                     <table class="table table-hover table-sm table-bordered">
                         <thead class="table-light">
@@ -429,8 +429,7 @@ include __DIR__ . '/../includes/header.php';
                                 <th>Malzeme (Döküm Tipi)</th>
                                 <th class="text-end">Dönem Net (kg)</th>
                                 <th class="text-end">Dönem Tutar (₺)</th>
-                                <th class="text-end">Genel Net (kg)</th>
-                                <th class="text-end">Genel Tutar (₺)</th>
+                                <th class="text-end">Oran (%)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -439,8 +438,7 @@ include __DIR__ . '/../includes/header.php';
                                     <td><?php echo htmlspecialchars($m['malzeme'] ?? '-'); ?></td>
                                     <td class="text-end"><?php echo number_format((float)($m['donem_net_kg'] ?? 0), 0, ',', '.'); ?></td>
                                     <td class="text-end"><?php echo number_format((float)($m['donem_tutar'] ?? 0), 2, ',', '.'); ?></td>
-                                    <td class="text-end"><?php echo number_format((float)($m['genel_net_kg'] ?? 0), 0, ',', '.'); ?></td>
-                                    <td class="text-end"><?php echo number_format((float)($m['genel_tutar'] ?? 0), 2, ',', '.'); ?></td>
+                                    <td class="text-end"><?php echo number_format((float)($m['oran'] ?? 0), 1, ',', '.'); ?>%</td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -450,8 +448,7 @@ include __DIR__ . '/../includes/header.php';
                                 <th>Toplam</th>
                                 <th class="text-end"><?php echo number_format($sumDonemKg, 0, ',', '.'); ?></th>
                                 <th class="text-end"><?php echo number_format($sumDonemTutar, 2, ',', '.'); ?></th>
-                                <th class="text-end"><?php echo number_format($sumGenelKg, 0, ',', '.'); ?></th>
-                                <th class="text-end"><?php echo number_format($sumGenelTutar, 2, ',', '.'); ?></th>
+                                <th class="text-end">100%</th>
                             </tr>
                         </tfoot>
                         <?php endif; ?>

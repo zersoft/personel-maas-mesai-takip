@@ -35,7 +35,7 @@ return [
     [
         'version' => '2.0.0',
         'date'    => '2025-01-15',
-        'title'   => 'Personel Takip Sistemi 2.0',
+        'title'   => 'OYS 2.0 - Ocak Yönetim Sistemi',
         'notes'   => [
             'Ana modüller: Personel, Bordro, Puantaj, Fazla Mesai, Avans, Tazminat, Raporlar.',
             'Kullanıcı ve rol yönetimi.',

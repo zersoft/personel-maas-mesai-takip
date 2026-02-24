@@ -86,7 +86,7 @@ class CariEkstrePDF extends TCPDF {
 }
 
 $pdf = new CariEkstrePDF('P', PDF_UNIT, 'A4', true, 'UTF-8', false);
-$pdf->SetCreator('Personel Takip Sistemi');
+$pdf->SetCreator('OYS - Ocak Yönetim Sistemi');
 $pdf->SetAuthor('ZERSOFT');
 $pdf->SetTitle('Cari Ekstre - ' . $cari_firma);
 $pdf->SetMargins(10, 18, 10);

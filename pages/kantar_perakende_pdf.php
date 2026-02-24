@@ -93,7 +93,7 @@ class PerakendePDF extends TCPDF {
 }
 
 $pdf = new PerakendePDF('L', PDF_UNIT, 'A4', true, 'UTF-8', false);
-$pdf->SetCreator('Personel Takip Sistemi');
+$pdf->SetCreator('OYS - Ocak Yönetim Sistemi');
 $pdf->SetAuthor('ZERSOFT');
 $pdf->SetTitle('Perakende Satış - ' . $baslangic . '_' . $bitis);
 $pdf->SetMargins(8, 16, 8);

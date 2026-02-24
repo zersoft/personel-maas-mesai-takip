@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giriş - Personel Takip Sistemi</title>
+    <title>Giriş - OYS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
@@ -122,8 +122,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="card shadow-lg">
             <div class="card-body p-5">
                 <div class="text-center mb-4">
-                    <i class="bi bi-people-fill text-primary" style="font-size: 3rem;"></i>
-                    <h3 class="mt-3">Personel Takip Sistemi</h3>
+                    <i class="bi bi-layers text-primary" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3">OYS</h3>
+                    <p class="text-muted small mb-0">Ocak Yönetim Sistemi</p>
                     <p class="text-muted">Giriş Yapın</p>
                 </div>
                 
@@ -158,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 <div class="text-center mt-4">
                     <small class="text-muted">
-                        © <?php echo date('Y'); ?> <a href="https://zersoft.net" target="_blank" class="text-decoration-none">ZERSOFT</a> Personel Takip Sistemi
+                        © <?php echo date('Y'); ?> <a href="https://zersoft.net" target="_blank" class="text-decoration-none">ZERSOFT</a> OYS - Ocak Yönetim Sistemi
                         <a href="#" class="text-decoration-none ms-2" title="Sürüm notlarını görüntüle" data-bs-toggle="modal" data-bs-target="#versionNotesModal"><span class="badge bg-secondary">v<?php echo htmlspecialchars($appVersion); ?></span></a>
                     </small>
                 </div>
