@@ -114,6 +114,11 @@ $currentPage = basename($scriptPath);
                             <i class="bi bi-graph-up"></i> Raporlar
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo ($currentPage === 'kantar_raporlari.php') ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>kantar_raporlari.php">
+                            <i class="bi bi-truck"></i> Kantar Raporları
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>

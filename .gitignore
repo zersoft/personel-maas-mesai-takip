@@ -9,8 +9,8 @@
 .DS_Store
 Thumbs.db
 
-# Config files with sensitive data
-config/db.php
+# Environment (şifreler ve hassas veriler)
+.env
 
 # Uploads and temp files
 uploads/
