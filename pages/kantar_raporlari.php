@@ -9,9 +9,12 @@ if (!in_array($rapor, ['perakende', 'ozet', 'ozet_malzeme', 'cari'], true)) {
     $rapor = 'perakende';
 }
 
-// Tarih: pratik seçenek veya özel aralık
-$periyot = isset($_GET['periyot']) ? $_GET['periyot'] : '';
+// Tarih: pratik seçenek veya özel aralık (varsayılan: bugün)
 $today = date('Y-m-d');
+$periyot = isset($_GET['periyot']) ? $_GET['periyot'] : '';
+if ($periyot === '' && !isset($_GET['baslangic']) && !isset($_GET['bitis'])) {
+    $periyot = 'bugun';
+}
 if ($periyot === 'bugun') {
     $baslangic = $bitis = $today;
 } elseif ($periyot === 'bu_hafta') {
