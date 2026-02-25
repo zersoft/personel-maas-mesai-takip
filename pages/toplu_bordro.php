@@ -56,7 +56,7 @@ if (isset($_GET['success'])) {
     echo showMessage($eklenenSayisi . ' personel için bordro başarıyla oluşturuldu!', 'success');
 }
 if (isset($_GET['info'])) {
-    $mesaj = isset($_GET['mesaj']) ? urldecode($_GET['mesaj']) : 'Bilgi';
+    $mesaj = $_GET['mesaj'] ?? 'Bilgi';
     echo showMessage($mesaj, 'info');
 }
 if (isset($_GET['error'])) {

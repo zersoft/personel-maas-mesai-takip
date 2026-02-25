@@ -52,7 +52,7 @@ if (isset($_GET['error'])) {
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-pencil-square"></i> Fazla Mesai Düzenle</h1>
-    <a href="fazla_mesai.php?<?php echo http_build_query($returnParams); ?>" class="btn btn-secondary">
+    <a href="fazla_mesai.php?<?php echo htmlspecialchars(http_build_query($returnParams), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-secondary">
         <i class="bi bi-arrow-left"></i> Geri Dön
     </a>
 </div>
@@ -109,7 +109,7 @@ if (isset($_GET['error'])) {
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-save"></i> Güncelle
                 </button>
-                <a href="fazla_mesai.php?<?php echo http_build_query($returnParams); ?>" class="btn btn-secondary">İptal</a>
+                <a href="fazla_mesai.php?<?php echo htmlspecialchars(http_build_query($returnParams), ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-secondary">İptal</a>
             </div>
         </form>
     </div>

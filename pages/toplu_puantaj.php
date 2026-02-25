@@ -26,6 +26,7 @@ include '../includes/header.php';
 <div class="card">
     <div class="card-body">
         <form method="POST" action="puantaj_islem.php">
+            <?php echo csrfField(); ?>
             <input type="hidden" name="action" value="bulk_insert">
             <div class="row g-3 align-items-end mb-3">
                 <div class="col-md-2">

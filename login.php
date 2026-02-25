@@ -1,4 +1,10 @@
 <?php
+// HTTP güvenlik header'ları
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('X-XSS-Protection: 1; mode=block');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+
 // Session ayarları (ob_start'tan ÖNCE)
 $appSessionPath = __DIR__ . '/storage/sessions';
 if (!is_dir($appSessionPath)) {
@@ -20,6 +26,8 @@ ini_set('session.use_only_cookies', 1);
 // ob_start();
 
 require_once 'config/db.php';
+require_once 'includes/functions.php';
+require_once 'includes/auth.php';
 
 // Versiyon bilgisini yükle
 $appConfigPath = __DIR__ . '/config/app.php';
@@ -44,17 +52,40 @@ if (isset($_SESSION['user_id'])) {
 
 $error = '';
 
+// Brute force koruması
+if (!isset($_SESSION['login_attempts'])) {
+    $_SESSION['login_attempts'] = 0;
+    $_SESSION['login_first_attempt'] = time();
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken();
+
+    // 15 dakika içinde 5'ten fazla başarısız deneme varsa engelle
+    if ($_SESSION['login_attempts'] >= 5) {
+        $elapsed = time() - $_SESSION['login_first_attempt'];
+        if ($elapsed < 900) { // 15 dakika
+            $remaining = ceil((900 - $elapsed) / 60);
+            $error = "Çok fazla hatalı giriş denemesi. Lütfen {$remaining} dakika sonra tekrar deneyin.";
+        } else {
+            // Süre doldu, sayacı sıfırla
+            $_SESSION['login_attempts'] = 0;
+            $_SESSION['login_first_attempt'] = time();
+        }
+    }
+
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
-    
-    if ($username && $password) {
+
+    if (!$error && $username && $password) {
         try {
             $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? AND aktif = 1");
             $stmt->execute([$username]);
             $user = $stmt->fetch();
-            
+
             if ($user && password_verify($password, $user['password'])) {
+                // Başarılı giriş, sayacı sıfırla
+                $_SESSION['login_attempts'] = 0;
                 // Session fixation koruması
                 session_regenerate_id(true);
                 // Giriş başarılı
@@ -87,6 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: index.php');
                 exit;
             } else {
+                $_SESSION['login_attempts']++;
                 $error = 'Kullanıcı adı veya şifre hatalı!';
             }
         } catch(PDOException $e) {
@@ -139,6 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php endif; ?>
                 
                 <form method="POST">
+                    <?php echo csrfField(); ?>
                     <div class="mb-3">
                         <label class="form-label">Kullanıcı Adı</label>
                         <div class="input-group">

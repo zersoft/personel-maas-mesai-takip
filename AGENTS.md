@@ -95,6 +95,22 @@ All agents (Claude Code, Cursor, Copilot, etc.) MUST follow these rules when wri
 - Always use `safeRedirect()` instead of raw `header('Location: ...')` for redirects.
 - Always call `exit` or `die` after redirects if not using `safeRedirect()`.
 
+### 11. HTTP Security Headers
+
+- `header.php` and `login.php` set security headers automatically. If creating a standalone page (without header.php), add these headers:
+
+  ```php
+  header('X-Content-Type-Options: nosniff');
+  header('X-Frame-Options: SAMEORIGIN');
+  header('X-XSS-Protection: 1; mode=block');
+  header('Referrer-Policy: strict-origin-when-cross-origin');
+  ```
+
+### 12. Brute Force Protection
+
+- Login page has rate limiting: 5 failed attempts = 15 min lockout.
+- Never remove or weaken this protection.
+
 ---
 
 ## Cursor Cloud specific instructions
