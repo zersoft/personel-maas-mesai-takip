@@ -5,6 +5,23 @@
  */
 return [
     [
+        'version' => '2.0.4',
+        'date'    => '2025-02-15',
+        'title'   => 'OYS markası, Kantar Raporları, Viewer rolü',
+        'notes'   => [
+            'Uygulama adı OYS (Ocak Yönetim Sistemi) olarak güncellendi; taş ocağı / agrega üretimi odağı.',
+            'Simge bi-layers (katmanlar) ile değiştirildi.',
+            'Kantar Raporları: Perakende Satış, Özet Rapor, Özet Malzeme Satış, Cari Ekstre sekmeleri ve PDF çıktıları.',
+            'Periyot seçimi (Bugün, Bu Hafta, Bu Ay, Bu Yıl); varsayılan tarih aralığı bugün; seçili periyot butonu vurgulandı.',
+            'Özet Malzeme Satış: sadece dönem sütunları; seçili dönemdeki toplam miktara göre Oran (%) sütunu eklendi.',
+            'Perakende Satış: personel sütunu kaldırıldı; filtre müşteri veya plaka ile arama yapıyor.',
+            'Cari Ekstre: müşteri seçimi Select2 ile aranabilir hale getirildi.',
+            'Özet Rapor PDF: sütun başlıkları kısaltıldı (üst üste binme düzeltildi).',
+            'Viewer rolü: ekleme ve düzenleme butonları görünmüyor; tüm işlem sayfaları requireRole(\'user\') ile korunuyor.',
+            'Veritabanı ayarları .env ve config/load_env.php ile yönetiliyor; raporlama DB ayrı tanımlanabiliyor.',
+        ],
+    ],
+    [
         'version' => '2.0.3',
         'date'    => '2025-02-14',
         'title'   => 'Fazla mesai alacak raporu ve PDF',

@@ -427,5 +427,5 @@ Detaylı lisans bilgileri için `LICENSE` dosyasına bakınız.
 ---
 
 **Son Güncelleme**: Şubat 2025  
-**Versiyon**: 2.0.3 (OYS)  
+**Versiyon**: 2.0.4 (OYS)  
 **Geliştirici**: ZERSOFT
