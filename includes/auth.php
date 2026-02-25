@@ -102,8 +102,16 @@ function verifyCsrfToken() {
     $token = $_POST['csrf_token'] ?? '';
     if (empty($token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
         http_response_code(403);
+        // Login sayfasından gelen POST: redirect etme, login sayfası kendi formunu göstersin (session cookie bu yanıtta set edilir)
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+        $isLoginPost = ($_SERVER['REQUEST_METHOD'] === 'POST' && (strpos($scriptName, 'login.php') !== false));
+        if ($isLoginPost) {
+            // verifyCsrfToken()'ı atla; login.php'de hata gösterip formu tekrar render edecek (yeni token ile)
+            return false;
+        }
         die('Geçersiz istek (CSRF doğrulaması başarısız).');
     }
+    return true;
 }
 
 // Form için CSRF hidden input

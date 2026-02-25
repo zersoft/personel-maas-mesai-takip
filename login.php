@@ -13,10 +13,24 @@ if (!is_dir($appSessionPath)) {
 if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 	ini_set('session.save_path', $appSessionPath);
 }
-// Cookie ayarları
-ini_set('session.cookie_lifetime', 0); // Tarayıcı kapanana kadar
-ini_set('session.cookie_path', '/');
-ini_set('session.cookie_httponly', 1);
+// Cookie ayarları – path ve SameSite ile form POST'ta cookie gönderilsin
+$scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+$cookiePath = ($scriptDir === '' || $scriptDir === '/' || $scriptDir === '\\') ? '/' : (rtrim($scriptDir, '/\\') . '/');
+$secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+if (PHP_VERSION_ID >= 70300) {
+	session_set_cookie_params([
+		'lifetime' => 0,
+		'path' => $cookiePath,
+		'domain' => '',
+		'secure' => $secure,
+		'httponly' => true,
+		'samesite' => 'Lax'
+	]);
+} else {
+	ini_set('session.cookie_path', $cookiePath);
+	ini_set('session.cookie_lifetime', 0);
+	ini_set('session.cookie_httponly', 1);
+}
 ini_set('session.use_only_cookies', 1);
 
 // Session başlat
@@ -51,6 +65,10 @@ if (isset($_SESSION['user_id'])) {
 }
 
 $error = '';
+if (isset($_GET['csrf']) || !empty($_SESSION['login_csrf_error'])) {
+    unset($_SESSION['login_csrf_error']);
+    $error = 'Oturum süresi dolmuş veya güvenlik doğrulaması geçersiz. Lütfen tekrar giriş yapın.';
+}
 
 // Brute force koruması
 if (!isset($_SESSION['login_attempts'])) {
@@ -59,8 +77,12 @@ if (!isset($_SESSION['login_attempts'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    verifyCsrfToken();
+    $csrfOk = verifyCsrfToken();
+    if (!$csrfOk) {
+        $error = 'Oturum süresi dolmuş veya güvenlik doğrulaması geçersiz. Lütfen tekrar giriş yapın.';
+    }
 
+    if ($csrfOk) {
     // 15 dakika içinde 5'ten fazla başarısız deneme varsa engelle
     if ($_SESSION['login_attempts'] >= 5) {
         $elapsed = time() - $_SESSION['login_first_attempt'];
@@ -128,6 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $error = 'Lütfen tüm alanları doldurun!';
     }
+    } // if ($csrfOk)
 }
 ?>
 <!DOCTYPE html>
