@@ -106,12 +106,14 @@ if (isset($_GET['error'])) {
         <a href="bordro_odeme_ozeti.php?ay=<?php echo $seciliAy; ?>&yil=<?php echo $seciliYil; ?>" class="btn btn-outline-secondary me-2">
             <i class="bi bi-receipt"></i> Ödeme Özeti
         </a>
+        <?php if (canEdit()): ?>
         <a href="toplu_bordro.php" class="btn btn-success me-2">
             <i class="bi bi-file-earmark-spreadsheet"></i> Toplu Bordro Oluştur
         </a>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bordroEkleModal">
             <i class="bi bi-plus-circle"></i> Yeni Bordro Oluştur
         </button>
+        <?php endif; ?>
     </div>
     
 </div>
@@ -261,12 +263,14 @@ if (isset($_GET['error'])) {
                                     <button class="btn btn-sm btn-info" onclick="gosterBordro(<?php echo $bordro['id']; ?>)">
                                         <i class="bi bi-eye"></i>
                                     </button>
+                                    <?php if (canEdit()): ?>
                                     <button class="btn btn-sm btn-warning" onclick="duzenleBordro(<?php echo $bordro['id']; ?>)">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <button class="btn btn-sm btn-danger" onclick="silBordro(<?php echo $bordro['id']; ?>)">
                                         <i class="bi bi-trash"></i>
                                     </button>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -289,6 +293,7 @@ if (isset($_GET['error'])) {
     </div>
 <?php endif; ?>
 
+<?php if (canEdit()): ?>
 <!-- Bordro Ekle Modal -->
 <div class="modal fade" id="bordroEkleModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -417,6 +422,7 @@ if (isset($_GET['error'])) {
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
     // Bordro modalı açıldığında personel seçildiğinde maaş bilgilerini otomatik doldur

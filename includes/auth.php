@@ -33,6 +33,12 @@ function requireLogin() {
     }
 }
 
+// Viewer hiç ekleme/düzenleme/silme yapamaz; sadece user ve admin yapabilir
+function canEdit() {
+    $rol = $_SESSION['rol'] ?? '';
+    return $rol !== 'viewer';
+}
+
 // Yetki kontrolü
 function requireRole($requiredRole) {
     requireLogin();

@@ -56,11 +56,13 @@ if (isset($_GET['error'])) {
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-people"></i> Personel Listesi</h1>
+    <?php if (canEdit()): ?>
     <div class="d-flex gap-2">
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#personelEkleModal">
         <i class="bi bi-person-plus"></i> Yeni Personel Ekle
     </button>
     </div>
+    <?php endif; ?>
 </div>
 
 <!-- Filtreleme Formu -->
@@ -180,8 +182,10 @@ if (isset($_GET['error'])) {
                                 <td class="text-end">
                                     <?php if($personel['aktif']): ?>
                                         <div class="btn-group btn-group-sm" role="group">
+                                            <?php if (canEdit()): ?>
                                             <button class="btn btn-warning" title="Düzenle" onclick="duzenlePersonel(<?php echo $personel['id']; ?>)"><i class="bi bi-pencil"></i></button>
                                             <button class="btn btn-danger" title="Sil" onclick="silPersonel(<?php echo $personel['id']; ?>)"><i class="bi bi-trash"></i></button>
+                                            <?php endif; ?>
                                             <div class="btn-group btn-group-sm" role="group">
                                                 <button type="button" class="btn btn-info dropdown-toggle" data-bs-toggle="dropdown" title="Kayıtlar">
                                                     <i class="bi bi-three-dots"></i>
@@ -197,9 +201,11 @@ if (isset($_GET['error'])) {
                                             </div>
                                         </div>
                                     <?php else: ?>
+                                        <?php if (canEdit()): ?>
                                         <div class="btn-group btn-group-sm" role="group">
                                             <button class="btn btn-success" title="Geri Al" onclick="geriAlPersonel(<?php echo $personel['id']; ?>)"><i class="bi bi-arrow-counterclockwise"></i></button>
                                         </div>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -221,6 +227,7 @@ if (isset($_GET['error'])) {
     </div>
 <?php endif; ?>
 
+<?php if (canEdit()): ?>
 <!-- Personel Ekle Modal -->
 <div class="modal fade" id="personelEkleModal" tabindex="-1">
     <div class="modal-dialog">
@@ -291,6 +298,7 @@ if (isset($_GET['error'])) {
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <?php include '../includes/footer.php'; ?>
 

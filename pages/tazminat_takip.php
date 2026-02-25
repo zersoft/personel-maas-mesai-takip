@@ -20,9 +20,11 @@ include '../includes/header.php';
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-file-earmark-text"></i> Tazminat Takibi</h1>
+    <?php if (canEdit()): ?>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#tazminatEkleModal">
         <i class="bi bi-plus-circle"></i> Tazminat Ekle
     </button>
+    <?php endif; ?>
 </div>
 
 <?php if (empty($tazminatlar)): ?>
@@ -55,12 +57,14 @@ include '../includes/header.php';
                                 <td class="money"><?php echo formatMoney($tazminat['tutar']); ?></td>
                                 <td><?php echo escape($tazminat['aciklama']); ?></td>
                                 <td>
+                                    <?php if (canEdit()): ?>
                                     <button class="btn btn-sm btn-warning" onclick="duzenleTazminat(<?php echo $tazminat['id']; ?>)">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <button class="btn btn-sm btn-danger" onclick="silTazminat(<?php echo $tazminat['id']; ?>)">
                                         <i class="bi bi-trash"></i>
                                     </button>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -71,6 +75,7 @@ include '../includes/header.php';
     </div>
 <?php endif; ?>
 
+<?php if (canEdit()): ?>
 <!-- Tazminat Ekle Modal -->
 <div class="modal fade" id="tazminatEkleModal" tabindex="-1">
     <div class="modal-dialog">
@@ -126,6 +131,7 @@ include '../includes/header.php';
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <?php include '../includes/footer.php'; ?>
 

@@ -23,7 +23,7 @@ require_once '../includes/functions.php';
 require_once '../includes/auth.php';
 
 // Giriş kontrolü
-requireLogin();
+requireRole('user');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {

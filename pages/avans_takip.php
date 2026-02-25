@@ -60,9 +60,11 @@ include '../includes/header.php';
                 <i class="bi bi-file-pdf"></i> PDF Rapor
             </a>
         <?php endif; ?>
+        <?php if (canEdit()): ?>
         <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#avansEkleModal">
             <i class="bi bi-plus-circle"></i> Avans Ekle
         </button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -98,12 +100,14 @@ include '../includes/header.php';
                                 <td class="money"><?php echo formatMoney(((float)($avans['banka_tutari'] ?? 0) + (float)($avans['nakit_tutari'] ?? 0)) > 0 ? ((float)($avans['banka_tutari'] ?? 0) + (float)($avans['nakit_tutari'] ?? 0)) : (float)($avans['avans_tutari'] ?? 0)); ?></td>
                                 <td><?php echo escape($avans['aciklama']); ?></td>
                                 <td>
+                                    <?php if (canEdit()): ?>
                                     <button class="btn btn-sm btn-warning" onclick="duzenleAvans(<?php echo $avans['id']; ?>)">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <button class="btn btn-sm btn-danger" onclick="silAvans(<?php echo $avans['id']; ?>)">
                                         <i class="bi bi-trash"></i>
                                     </button>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -114,6 +118,7 @@ include '../includes/header.php';
     </div>
 <?php endif; ?>
 
+<?php if (canEdit()): ?>
 <!-- Avans Ekle Modal -->
 <div class="modal fade" id="avansEkleModal" tabindex="-1">
     <div class="modal-dialog">
@@ -183,6 +188,7 @@ include '../includes/header.php';
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <?php include '../includes/footer.php'; ?>
 

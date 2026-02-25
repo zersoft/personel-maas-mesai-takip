@@ -20,7 +20,7 @@ require_once '../includes/functions.php';
 require_once '../includes/auth.php';
 
 // Giriş kontrolü
-requireLogin();
+requireRole('user');
 
 ob_start();
 

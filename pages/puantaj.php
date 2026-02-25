@@ -60,9 +60,11 @@ if (isset($_GET['error'])) echo showMessage('Hata: ' . escape($_GET['error']), '
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-clipboard-data"></i> Puantaj Yönetimi</h1>
     <div class="d-flex align-items-center gap-2">
-        <a href="toplu_puantaj.php" class="btn btn-success"><i class="bi bi-clipboard-plus"></i> Toplu Puantaj Oluştur</a>
         <a href="puantaj_ekstre.php" class="btn btn-outline-secondary"><i class="bi bi-journal-text"></i> Puantaj Ekstresi</a>
+        <?php if (canEdit()): ?>
+        <a href="toplu_puantaj.php" class="btn btn-success"><i class="bi bi-clipboard-plus"></i> Toplu Puantaj Oluştur</a>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#puantajEkleModal"><i class="bi bi-plus-circle"></i> Yeni Puantaj Ekle</button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -159,6 +161,7 @@ if (isset($_GET['error'])) echo showMessage('Hata: ' . escape($_GET['error']), '
 </div>
 <?php endif; ?>
 
+<?php if (canEdit()): ?>
 <!-- Puantaj Ekle Modal -->
 <div class="modal fade" id="puantajEkleModal" tabindex="-1">
     <div class="modal-dialog">
@@ -211,6 +214,7 @@ if (isset($_GET['error'])) echo showMessage('Hata: ' . escape($_GET['error']), '
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function(){

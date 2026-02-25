@@ -189,6 +189,7 @@ if (isset($_GET['error'])) {
         <a href="fazla_mesai_odeme_listesi.php" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-receipt"></i> Ödeme Listesi
         </a>
+        <?php if (canEdit()): ?>
         <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#odemeYapModal">
             <i class="bi bi-cash-coin"></i> Ödeme Yap
         </button>
@@ -201,6 +202,7 @@ if (isset($_GET['error'])) {
         <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#fazlaMesaiEkleModal">
             <i class="bi bi-plus-circle"></i> FM Ekle
         </button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -353,12 +355,14 @@ if (isset($_GET['error'])) {
                                         <td class="money"><?php echo formatMoney($fm['tutar']); ?></td>
                                         <td><?php echo escape($fm['aciklama']); ?></td>
                                         <td>
+                                            <?php if (canEdit()): ?>
                                             <button class="btn btn-sm btn-warning" onclick="duzenleFazlaMesai(<?php echo $fm['id']; ?>)">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
                                             <button class="btn btn-sm btn-danger" onclick="silFazlaMesai(<?php echo $fm['id']; ?>)">
                                                 <i class="bi bi-trash"></i>
                                             </button>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -498,6 +502,7 @@ if (isset($_GET['error'])) {
     </div>
 </div>
 
+<?php if (canEdit()): ?>
 <!-- Fazla Mesai Ekle Modal -->
 <div class="modal fade" id="fazlaMesaiEkleModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -663,6 +668,7 @@ if (isset($_GET['error'])) {
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
     document.getElementById('selectAll')?.addEventListener('change', function() {

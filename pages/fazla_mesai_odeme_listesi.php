@@ -148,12 +148,14 @@ if (isset($_GET['error'])) {
                                 <td><?php echo escape($o['aciklama'] ?? ''); ?></td>
                                 <td><?php echo date('d.m.Y H:i', strtotime($o['odeme_zamani'])); ?></td>
                                 <td>
+                                    <?php if (canEdit()): ?>
                                     <a href="fazla_mesai_odeme_duzenle.php?id=<?php echo $o['id']; ?>" class="btn btn-sm btn-warning" title="Düzenle">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     <button class="btn btn-sm btn-danger" title="Sil" onclick="silOdeme(<?php echo $o['id']; ?>)">
                                         <i class="bi bi-trash"></i>
                                     </button>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
