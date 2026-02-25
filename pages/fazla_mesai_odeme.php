@@ -97,6 +97,7 @@ if (isset($_GET['error'])) {
         </div>
         <div class="card-body">
             <form action="fazla_mesai_odeme_islem.php" method="POST">
+                <?php echo csrfField(); ?>
                 <input type="hidden" name="personel_id" value="<?php echo $personel_id; ?>">
                 
                 <div class="mb-3">

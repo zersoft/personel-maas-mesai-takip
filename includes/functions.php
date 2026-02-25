@@ -96,8 +96,9 @@ function showMessage($message, $type = 'success') {
         'warning' => 'alert-warning'
     ];
     $alertClass = $alertClasses[$type] ?? 'alert-info';
+    $escapedMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
     return "<div class='alert $alertClass alert-dismissible fade show' role='alert'>
-                $message
+                $escapedMessage
                 <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
             </div>";
 }

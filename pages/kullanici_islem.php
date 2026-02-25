@@ -3,7 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) {
 	$appSessionPath = __DIR__ . '/../storage/sessions';
 	if (!is_dir($appSessionPath)) {
-		@mkdir($appSessionPath, 0777, true);
+		@mkdir($appSessionPath, 0700, true);
 	}
 	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 		ini_set('session.save_path', $appSessionPath);
@@ -24,9 +24,10 @@ ob_start();
 // Sadece admin
 requireRole('admin');
 
-$action = $_POST['action'] ?? ($_GET['action'] ?? '');
+$action = $_POST['action'] ?? '';
 
 try {
+    verifyCsrfToken();
     if ($action === 'insert') {
         $username = $_POST['username'] ?? '';
         $password = $_POST['password'] ?? '';
@@ -72,13 +73,14 @@ try {
         safeRedirect('kullanici_yonetimi.php?success=1');
         
     } elseif ($action === 'delete') {
-        $id = (int)($_GET['id'] ?? 0);
+        verifyCsrfToken();
+        $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) throw new Exception('Geçersiz ID');
         if ($id == $_SESSION['user_id']) throw new Exception('Kendi hesabınızı silemezsiniz');
-        
+
         $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
         $stmt->execute([$id]);
-        
+
         logUserAction('users', 'DELETE', $id, "Kullanıcı silindi");
         safeRedirect('kullanici_yonetimi.php?success=1');
     } else {

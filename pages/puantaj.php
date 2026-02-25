@@ -171,6 +171,7 @@ if (isset($_GET['error'])) echo showMessage('Hata: ' . escape($_GET['error']), '
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="puantaj_islem.php" method="POST">
+                <?php echo csrfField(); ?>
                 <input type="hidden" name="action" value="insert">
                 <div class="modal-body">
                     <div class="mb-3">

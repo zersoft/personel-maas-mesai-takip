@@ -3,7 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) {
 	$appSessionPath = __DIR__ . '/../storage/sessions';
 	if (!is_dir($appSessionPath)) {
-		@mkdir($appSessionPath, 0777, true);
+		@mkdir($appSessionPath, 0700, true);
 	}
 	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 		ini_set('session.save_path', $appSessionPath);
@@ -24,7 +24,12 @@ require_once '../includes/auth.php';
 // Giriş kontrolü
 requireRole('user');
 
-$action = $_POST['action'] ?? ($_GET['action'] ?? '');
+$action = $_POST['action'] ?? '';
+
+// Tüm POST istekleri için CSRF doğrulaması
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken();
+}
 
 try {
     if ($action === 'insert') {
@@ -60,7 +65,7 @@ try {
         $yil = (int)date('Y', strtotime($tarih));
         safeRedirect('puantaj.php?ay=' . $ay . '&yil=' . $yil . '&success=1');
     } elseif ($action === 'delete') {
-        $id = (int)($_GET['id'] ?? 0);
+        $id = (int)($_POST['id'] ?? 0);
         if ($id <= 0) safeRedirect('puantaj.php?error=' . urlencode('Geçersiz ID'));
         $row = $pdo->prepare('SELECT tarih FROM puantaj WHERE id=?');
         $row->execute([$id]);

@@ -60,6 +60,7 @@ if (isset($_GET['error'])) {
 <div class="card" style="max-width: 800px; margin: 0 auto;">
     <div class="card-body">
         <form action="fazla_mesai_islem.php" method="POST">
+            <?php echo csrfField(); ?>
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" value="<?php echo $fazlaMesai['id']; ?>">
             <input type="hidden" name="return_params" value="<?php echo htmlspecialchars(http_build_query($returnParams)); ?>">

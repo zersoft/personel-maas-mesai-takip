@@ -7,7 +7,7 @@ if (ob_get_level() > 0) {
 // Session başlat (aynı path ile)
 $appSessionPath = __DIR__ . '/storage/sessions';
 if (!is_dir($appSessionPath)) {
-	@mkdir($appSessionPath, 0777, true);
+	@mkdir($appSessionPath, 0700, true);
 }
 if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 	ini_set('session.save_path', $appSessionPath);

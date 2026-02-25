@@ -56,8 +56,8 @@ if (isset($_GET['success'])) {
     echo showMessage($eklenenSayisi . ' personel için bordro başarıyla oluşturuldu!', 'success');
 }
 if (isset($_GET['info'])) {
-    $mesaj = isset($_GET['mesaj']) ? $_GET['mesaj'] : 'Bilgi';
-    echo showMessage(urldecode($mesaj), 'info');
+    $mesaj = isset($_GET['mesaj']) ? urldecode($_GET['mesaj']) : 'Bilgi';
+    echo showMessage($mesaj, 'info');
 }
 if (isset($_GET['error'])) {
     echo showMessage('Hata: ' . escape($_GET['error']), 'danger');
@@ -102,6 +102,7 @@ if (isset($_GET['error'])) {
     </div>
 <?php else: ?>
     <form action="toplu_bordro_islem.php" method="POST">
+        <?php echo csrfField(); ?>
         <input type="hidden" name="ay" value="<?php echo $ay; ?>">
         <input type="hidden" name="yil" value="<?php echo $yil; ?>">
         

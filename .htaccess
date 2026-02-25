@@ -1,0 +1,26 @@
+# Hassas dosya ve dizinlere dogrudan erisimi engelle
+
+# .env dosyasina erisimi engelle
+<Files ".env">
+    Require all denied
+</Files>
+
+# SQL dosyalarina erisimi engelle
+<FilesMatch "\.(sql)$">
+    Require all denied
+</FilesMatch>
+
+# config dizinine erisimi engelle
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^config/ - [F,L]
+    RewriteRule ^storage/ - [F,L]
+</IfModule>
+
+# Dizin listelemeyi kapat
+Options -Indexes
+
+# CLAUDE.md ve diger hassas dosyalara erisimi engelle
+<FilesMatch "(^\.)|(\.(md|log|jsonl)$)">
+    Require all denied
+</FilesMatch>

@@ -4,7 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 	// Session dizini kontrolü ve ayarı (uygulama içi yol)
 	$appSessionPath = __DIR__ . '/../storage/sessions';
 	if (!is_dir($appSessionPath)) {
-		@mkdir($appSessionPath, 0777, true);
+		@mkdir($appSessionPath, 0700, true);
 	}
 	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 		ini_set('session.save_path', $appSessionPath);
@@ -87,4 +87,26 @@ function getBasePath() {
     $scriptPath = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '';
     $isInPages = (strpos($scriptPath, '/pages/') !== false);
     return $isInPages ? '../' : '';
+}
+
+// CSRF token oluştur
+function generateCsrfToken() {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+// CSRF token doğrula
+function verifyCsrfToken() {
+    $token = $_POST['csrf_token'] ?? '';
+    if (empty($token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+        http_response_code(403);
+        die('Geçersiz istek (CSRF doğrulaması başarısız).');
+    }
+}
+
+// Form için CSRF hidden input
+function csrfField() {
+    return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(generateCsrfToken(), ENT_QUOTES, 'UTF-8') . '">';
 }

@@ -37,6 +37,7 @@ if (!defined('APP_SHORT_NAME')) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="<?php echo $basePath; ?>assets/css/style.css">
+    <meta name="csrf-token" content="<?php echo htmlspecialchars(generateCsrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
 </head>
 <body>
     <!-- Üst Bar: Uygulama Adı ve Kullanıcı Bilgileri -->

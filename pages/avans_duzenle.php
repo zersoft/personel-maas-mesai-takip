@@ -37,6 +37,7 @@ include '../includes/header.php';
 <div class="card">
     <div class="card-body">
         <form action="avans_islem.php" method="POST" class="row g-3">
+            <?php echo csrfField(); ?>
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" value="<?php echo $id; ?>">
             <div class="col-md-6">

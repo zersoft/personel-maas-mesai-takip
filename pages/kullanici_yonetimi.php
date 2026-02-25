@@ -3,7 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) {
 	$appSessionPath = __DIR__ . '/../storage/sessions';
 	if (!is_dir($appSessionPath)) {
-		@mkdir($appSessionPath, 0777, true);
+		@mkdir($appSessionPath, 0700, true);
 	}
 	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 		ini_set('session.save_path', $appSessionPath);
@@ -119,6 +119,7 @@ if (isset($_GET['error'])) {
             </div>
             <form action="kullanici_islem.php" method="POST">
                 <input type="hidden" name="action" value="insert">
+                <?php echo csrfField(); ?>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Kullanıcı Adı</label>
@@ -167,7 +168,7 @@ function duzenleKullanici(id) {
 
 function silKullanici(id) {
     if (confirm('Bu kullanıcıyı silmek istediğinize emin misiniz?')) {
-        window.location.href = 'kullanici_islem.php?action=delete&id=' + id;
+        postDeleteForm('kullanici_islem.php', id);
     }
 }
 </script>

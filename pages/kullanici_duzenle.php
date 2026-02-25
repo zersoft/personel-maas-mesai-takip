@@ -3,7 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) {
 	$appSessionPath = __DIR__ . '/../storage/sessions';
 	if (!is_dir($appSessionPath)) {
-		@mkdir($appSessionPath, 0777, true);
+		@mkdir($appSessionPath, 0700, true);
 	}
 	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 		ini_set('session.save_path', $appSessionPath);
@@ -59,6 +59,7 @@ include '../includes/header.php';
         <form action="kullanici_islem.php" method="POST">
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" value="<?php echo $user['id']; ?>">
+            <?php echo csrfField(); ?>
             
             <div class="mb-3">
                 <label class="form-label">Kullanıcı Adı</label>

@@ -240,7 +240,7 @@ if (isset($_GET['error'])) {
                                 <td class="money"><?php echo formatMoney($bordro['brut_maas']); ?></td>
                                 <?php $ekoTooltip = '<div>Banka: '.formatMoney($ekoB).'</div>'.'<div>Nakit: '.formatMoney($ekoN).'</div>'; ?>
                                 <td class="money col-muted">
-                                    <span data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" title="<?php echo $ekoTooltip; ?>">
+                                    <span data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" title="<?php echo htmlspecialchars($ekoTooltip, ENT_QUOTES, 'UTF-8'); ?>">
                                         <?php echo formatMoney($ekoB + $ekoN); ?>
                                     </span>
                                 </td>
@@ -252,7 +252,7 @@ if (isset($_GET['error'])) {
                                               .'<div>Avans (Nakit): '.formatMoney($avN).'</div>';
                                 ?>
                                 <td class="money col-muted">
-                                    <span data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" title="<?php echo $tooltip; ?>">
+                                    <span data-bs-toggle="tooltip" data-bs-placement="top" data-bs-html="true" title="<?php echo htmlspecialchars($tooltip, ENT_QUOTES, 'UTF-8'); ?>">
                                         <?php echo formatMoney($toplamKesinti); ?>
                                     </span>
                                 </td>
@@ -303,6 +303,7 @@ if (isset($_GET['error'])) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="bordro_islem.php" method="POST">
+                <?php echo csrfField(); ?>
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -433,8 +434,8 @@ if (isset($_GET['error'])) {
 
         function guncelleMiniOzet() {
             if (!ayFiltre || !yilFiltre) return;
-            const ay = ayFiltre.value || '<?php echo $seciliAy; ?>';
-            const yil = yilFiltre.value || '<?php echo $seciliYil; ?>';
+            const ay = ayFiltre.value || <?php echo json_encode($seciliAy); ?>;
+            const yil = yilFiltre.value || <?php echo json_encode($seciliYil); ?>;
             fetch(`odeme_ozet_api.php?ay=${ay}&yil=${yil}`)
                 .then(r => r.json())
                 .then(d => {

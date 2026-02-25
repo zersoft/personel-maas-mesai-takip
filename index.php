@@ -1,12 +1,12 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+error_reporting(0);
+ini_set('display_errors', 0);
 
 // Session başlat (header.php'den önce)
 if (session_status() === PHP_SESSION_NONE) {
 	$appSessionPath = __DIR__ . '/storage/sessions';
 	if (!is_dir($appSessionPath)) {
-		@mkdir($appSessionPath, 0777, true);
+		@mkdir($appSessionPath, 0700, true);
 	}
 	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 		ini_set('session.save_path', $appSessionPath);

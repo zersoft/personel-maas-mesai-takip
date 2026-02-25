@@ -2,7 +2,7 @@
 // Session ayarları (ob_start'tan ÖNCE)
 $appSessionPath = __DIR__ . '/storage/sessions';
 if (!is_dir($appSessionPath)) {
-	@mkdir($appSessionPath, 0777, true);
+	@mkdir($appSessionPath, 0700, true);
 }
 if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 	ini_set('session.save_path', $appSessionPath);
@@ -55,6 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user = $stmt->fetch();
             
             if ($user && password_verify($password, $user['password'])) {
+                // Session fixation koruması
+                session_regenerate_id(true);
                 // Giriş başarılı
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
@@ -88,7 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Kullanıcı adı veya şifre hatalı!';
             }
         } catch(PDOException $e) {
-            $error = 'Bir hata oluştu: ' . $e->getMessage();
+            error_log('Login hatası: ' . $e->getMessage());
+            $error = 'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
         }
     } else {
         $error = 'Lütfen tüm alanları doldurun!';

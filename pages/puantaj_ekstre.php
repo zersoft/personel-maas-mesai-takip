@@ -81,11 +81,11 @@ include '../includes/header.php';
                     <div id="tarihInputs" class="d-flex gap-2" style="<?php echo $mode==='tarih'?'':'display:none;'; ?>">
                         <div>
                             <label class="form-label">Başlangıç</label>
-                            <input type="date" id="baslangic" class="form-control" value="<?php echo $baslangic; ?>">
+                            <input type="date" id="baslangic" class="form-control" value="<?php echo escape($baslangic); ?>">
                         </div>
                         <div>
                             <label class="form-label">Bitiş</label>
-                            <input type="date" id="bitis" class="form-control" value="<?php echo $bitis; ?>">
+                            <input type="date" id="bitis" class="form-control" value="<?php echo escape($bitis); ?>">
                         </div>
                     </div>
                     <div>
@@ -117,7 +117,7 @@ include '../includes/header.php';
                             <td><?php echo escape($r['aciklama']); ?></td>
                             <td class="no-print">
                                 <button class="btn btn-sm btn-warning" onclick="duzenle(<?php echo $r['id']; ?>)"><i class="bi bi-pencil"></i></button>
-                                <a class="btn btn-sm btn-danger" href="puantaj_islem.php?action=delete&id=<?php echo $r['id']; ?>" onclick="return confirm('Silinsin mi?')"><i class="bi bi-trash"></i></a>
+                                <button class="btn btn-sm btn-danger" onclick="silPuantaj(<?php echo $r['id']; ?>)"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
                     <?php endforeach; endif; ?>
@@ -136,6 +136,7 @@ include '../includes/header.php';
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form action="puantaj_islem.php" method="POST">
+        <?php echo csrfField(); ?>
         <input type="hidden" name="action" value="update">
         <input type="hidden" name="id" id="duz_id">
         <div class="modal-body">
@@ -173,6 +174,12 @@ include '../includes/header.php';
 </div>
 
 <script>
+function silPuantaj(id) {
+    if (confirm('Bu puantaj kaydını silmek istediğinize emin misiniz?')) {
+        postDeleteForm('puantaj_islem.php', id);
+    }
+}
+
 function duzenle(id){
   // Basitçe tablo satırından değerleri toplayalım
   const tr = event.target.closest('tr');

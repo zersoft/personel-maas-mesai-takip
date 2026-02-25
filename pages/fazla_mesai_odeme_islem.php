@@ -3,7 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) {
 	$appSessionPath = __DIR__ . '/../storage/sessions';
 	if (!is_dir($appSessionPath)) {
-		@mkdir($appSessionPath, 0777, true);
+		@mkdir($appSessionPath, 0700, true);
 	}
 	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 		ini_set('session.save_path', $appSessionPath);
@@ -31,9 +31,10 @@ function parseMoneyLocal($value) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken();
     try {
         $personel_id = isset($_POST['personel_id']) ? (int)$_POST['personel_id'] : null;
-        
+
         if (!$personel_id || $personel_id <= 0) {
             throw new Exception('Geçersiz personel ID');
         }

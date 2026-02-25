@@ -1,5 +1,37 @@
 // OYS - Ocak Yönetim Sistemi - Ana JavaScript Dosyası
 
+// CSRF token al
+function getCsrfToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+}
+
+// POST ile silme formu gönder (CSRF korumalı)
+function postDeleteForm(action, id) {
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = action;
+    form.style.display = 'none';
+    form.innerHTML = '<input type="hidden" name="action" value="delete">' +
+                     '<input type="hidden" name="id" value="' + id + '">' +
+                     '<input type="hidden" name="csrf_token" value="' + getCsrfToken() + '">';
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// POST ile restore formu gönder (CSRF korumalı)
+function postRestoreForm(action, id) {
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = action;
+    form.style.display = 'none';
+    form.innerHTML = '<input type="hidden" name="action" value="restore">' +
+                     '<input type="hidden" name="id" value="' + id + '">' +
+                     '<input type="hidden" name="csrf_token" value="' + getCsrfToken() + '">';
+    document.body.appendChild(form);
+    form.submit();
+}
+
 // Personel işlemleri
 function duzenlePersonel(id) {
     window.location.href = 'personel_duzenle.php?id=' + id;
@@ -7,13 +39,13 @@ function duzenlePersonel(id) {
 
 function silPersonel(id) {
     if (confirm('Bu personeli silmek istediğinize emin misiniz?')) {
-        window.location.href = 'personel_islem.php?action=delete&id=' + id;
+        postDeleteForm('personel_islem.php', id);
     }
 }
 
 function geriAlPersonel(id) {
     if (confirm('Bu personeli geri almak istiyor musunuz?')) {
-        window.location.href = 'personel_islem.php?action=restore&id=' + id;
+        postRestoreForm('personel_islem.php', id);
     }
 }
 
@@ -28,7 +60,7 @@ function duzenleBordro(id) {
 
 function silBordro(id) {
     if (confirm('Bu bordroyu silmek istediğinize emin misiniz?')) {
-        window.location.href = 'bordro_islem.php?action=delete&id=' + id;
+        postDeleteForm('bordro_islem.php', id);
     }
 }
 
@@ -50,7 +82,7 @@ function duzenleFazlaMesai(id) {
 
 function silFazlaMesai(id) {
     if (confirm('Bu fazla mesai kaydını silmek istediğinize emin misiniz?')) {
-        window.location.href = 'fazla_mesai_islem.php?action=delete&id=' + id;
+        postDeleteForm('fazla_mesai_islem.php', id);
     }
 }
 
@@ -67,7 +99,7 @@ function duzenleAvans(id) {
 
 function silAvans(id) {
     if (confirm('Bu avans kaydını silmek istediğinize emin misiniz?')) {
-        window.location.href = 'avans_islem.php?action=delete&id=' + id;
+        postDeleteForm('avans_islem.php', id);
     }
 }
 

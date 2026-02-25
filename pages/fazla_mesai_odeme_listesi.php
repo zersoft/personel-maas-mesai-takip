@@ -176,7 +176,7 @@ if (isset($_GET['error'])) {
 <script>
 function silOdeme(id) {
     if (confirm('Bu ödeme kaydını silmek istediğinize emin misiniz?')) {
-        window.location.href = 'fazla_mesai_odeme_kayit_islem.php?action=delete&id=' + id;
+        postDeleteForm('fazla_mesai_odeme_kayit_islem.php', id);
     }
 }
 </script>
@@ -191,6 +191,7 @@ function silOdeme(id) {
             </div>
             <form action="fazla_mesai_odeme_kayit_islem.php" method="POST">
                 <input type="hidden" name="action" value="single_payment">
+                <?php echo csrfField(); ?>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Personel</label>
@@ -238,6 +239,7 @@ function silOdeme(id) {
             </div>
             <form action="fazla_mesai_odeme_kayit_islem.php" method="POST">
                 <input type="hidden" name="action" value="bulk_payment">
+                <?php echo csrfField(); ?>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Ödeme Tarihi</label>

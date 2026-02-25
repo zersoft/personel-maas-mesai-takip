@@ -3,7 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) {
 	$appSessionPath = __DIR__ . '/../storage/sessions';
 	if (!is_dir($appSessionPath)) {
-		@mkdir($appSessionPath, 0777, true);
+		@mkdir($appSessionPath, 0700, true);
 	}
 	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 		ini_set('session.save_path', $appSessionPath);
@@ -26,6 +26,7 @@ require_once '../includes/auth.php';
 requireRole('user');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken();
     try {
         $ay = isset($_POST['ay']) ? (int)$_POST['ay'] : date('n');
         $yil = isset($_POST['yil']) ? (int)$_POST['yil'] : date('Y');

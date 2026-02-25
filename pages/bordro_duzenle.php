@@ -54,6 +54,7 @@ if (isset($_GET['error'])) {
 <div class="card">
     <div class="card-body">
         <form action="bordro_islem.php" method="POST" id="bordroForm">
+            <?php echo csrfField(); ?>
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" value="<?php echo $bordro['id']; ?>">
             <!-- Ham sayısal değerler için gizli alanlar (sunucu tarafı bu alanları önceliklendirir) -->

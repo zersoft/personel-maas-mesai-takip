@@ -47,6 +47,7 @@ if (isset($_GET['error'])) {
 <div class="card">
     <div class="card-body">
         <form action="personel_islem.php" method="POST">
+            <?php echo csrfField(); ?>
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" value="<?php echo $personel['id']; ?>">
             

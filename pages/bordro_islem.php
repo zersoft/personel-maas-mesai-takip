@@ -3,7 +3,7 @@
 if (session_status() === PHP_SESSION_NONE) {
 	$appSessionPath = __DIR__ . '/../storage/sessions';
 	if (!is_dir($appSessionPath)) {
-		@mkdir($appSessionPath, 0777, true);
+		@mkdir($appSessionPath, 0700, true);
 	}
 	if (is_dir($appSessionPath) && is_writable($appSessionPath)) {
 		ini_set('session.save_path', $appSessionPath);
@@ -23,10 +23,15 @@ require_once '../includes/auth.php';
 // Giriş kontrolü
 requireRole('user');
 
-// Silme işlemi
-if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
+// Tüm POST istekleri için CSRF doğrulaması
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken();
+}
+
+// Silme işlemi (POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     try {
-        $id = (int)$_GET['id'];
+        $id = (int)$_POST['id'];
         if ($id <= 0) {
             throw new Exception('Geçersiz ID');
         }

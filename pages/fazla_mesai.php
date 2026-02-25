@@ -512,6 +512,7 @@ if (isset($_GET['error'])) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="fazla_mesai_islem.php" method="POST">
+                <?php echo csrfField(); ?>
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-12">
@@ -571,6 +572,7 @@ if (isset($_GET['error'])) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="fazla_mesai_odeme_kayit_islem.php" method="POST">
+                <?php echo csrfField(); ?>
                 <input type="hidden" name="action" value="single_payment">
                 <div class="modal-body">
                     <div class="mb-3">
@@ -624,6 +626,7 @@ if (isset($_GET['error'])) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="fazla_mesai_odeme_kayit_islem.php" method="POST">
+                <?php echo csrfField(); ?>
                 <input type="hidden" name="action" value="bulk_payment">
                 <div class="modal-body">
                     <div class="mb-3">

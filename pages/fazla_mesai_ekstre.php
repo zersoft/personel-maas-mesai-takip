@@ -137,11 +137,11 @@ include '../includes/header.php';
                     <div id="tarihInputs" class="d-flex gap-2" style="<?php echo $mode==='tarih'?'':'display:none;'; ?>">
                         <div>
                             <label class="form-label">Başlangıç</label>
-                            <input type="date" id="baslangic" class="form-control" value="<?php echo $baslangic; ?>">
+                            <input type="date" id="baslangic" class="form-control" value="<?php echo escape($baslangic); ?>">
                         </div>
                         <div>
                             <label class="form-label">Bitiş</label>
-                            <input type="date" id="bitis" class="form-control" value="<?php echo $bitis; ?>">
+                            <input type="date" id="bitis" class="form-control" value="<?php echo escape($bitis); ?>">
                         </div>
                     </div>
                     <div>
