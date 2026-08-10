@@ -24,6 +24,12 @@ require_once $tcpdfPath;
 $baslangic = isset($_GET['baslangic']) ? $_GET['baslangic'] : date('Y-m-01');
 $bitis     = isset($_GET['bitis'])     ? $_GET['bitis']     : date('Y-m-d');
 $musteri   = isset($_GET['musteri'])   ? trim((string)$_GET['musteri']) : '';
+$plaka     = isset($_GET['plaka'])     ? trim((string)$_GET['plaka']) : '';
+$cikis_firma = isset($_GET['cikis_firma']) ? (int)$_GET['cikis_firma'] : 0;
+$hareket   = isset($_GET['hareket']) ? trim((string)$_GET['hareket']) : '';
+if (!in_array($hareket, ['', 'satis', 'tahsilat'], true)) {
+    $hareket = '';
+}
 
 if (!$pdoReport) {
     header('Content-Type: text/html; charset=utf-8');
@@ -46,15 +52,41 @@ function pdfFormatSahaZaman($zamanDamgasi) {
     return $s;
 }
 
+$cikisFirmaAdi = '';
+if ($cikis_firma > 0) {
+    try {
+        $st = $pdoReport->prepare("SELECT COALESCE(NULLIF(TRIM(FirmaAdi),''), CONCAT('ID ', ?)) AS adi FROM Cari WHERE CariID = ? LIMIT 1");
+        $st->execute([$cikis_firma, $cikis_firma]);
+        $cikisFirmaAdi = (string)($st->fetchColumn() ?: ('ID ' . $cikis_firma));
+    } catch (PDOException $e) {
+        $cikisFirmaAdi = 'ID ' . $cikis_firma;
+    }
+}
+
 try {
     $sql = "SELECT id, FirmaAdi, plaka, dokumTipi, dokumNetKg, brimFiyat, dokumTutar, kdv, genelTutar,
                    irsaliyeNo, irsaliyeSeri, islemTipi, tarih, islemZamanDamgasi
             FROM SahadanSatis WHERE status = 1 AND tarih BETWEEN ? AND ?";
     $params = [$tarihBas, $tarihBit];
     if ($musteri !== '') {
-        $sql .= " AND (FirmaAdi LIKE ? OR plaka LIKE ?)";
-        $params[] = '%' . $musteri . '%';
-        $params[] = '%' . $musteri . '%';
+        $sql .= " AND FirmaAdi = ?";
+        $params[] = $musteri;
+    }
+    if ($plaka !== '') {
+        $sql .= " AND plaka LIKE ?";
+        $params[] = '%' . $plaka . '%';
+    }
+    if ($hareket === 'satis') {
+        $sql .= " AND islemTipi = 'GELİR TAHAKKUK'";
+        if ($cikis_firma > 0) {
+            $sql .= " AND cikisFirmaID = ?";
+            $params[] = $cikis_firma;
+        }
+    } elseif ($hareket === 'tahsilat') {
+        $sql .= " AND islemTipi = 'GELİR TAHSİLAT'";
+    } elseif ($cikis_firma > 0) {
+        $sql .= " AND (cikisFirmaID = ? OR islemTipi = 'GELİR TAHSİLAT')";
+        $params[] = $cikis_firma;
     }
     $sql .= " ORDER BY tarih DESC, islemZamanDamgasi DESC";
     $stmt = $pdoReport->prepare($sql);
@@ -104,7 +136,13 @@ $pdf->SetFont('dejavusans', '', 7);
 $pdf->AddPage();
 
 $pdf->SetFont('dejavusans', '', 9);
-$pdf->Cell(0, 5, 'Dönem: ' . $baslangic . ' – ' . $bitis . ($musteri !== '' ? ' | Filtre: ' . $musteri : ''), 0, 1, 'L');
+$filtreMetin = '';
+if ($cikisFirmaAdi !== '') $filtreMetin .= ' | Çıkış: ' . $cikisFirmaAdi;
+if ($musteri !== '') $filtreMetin .= ' | Müşteri: ' . $musteri;
+if ($plaka !== '') $filtreMetin .= ' | Plaka: ' . $plaka;
+if ($hareket === 'satis') $filtreMetin .= ' | Hareket: Satış';
+elseif ($hareket === 'tahsilat') $filtreMetin .= ' | Hareket: Tahsilat';
+$pdf->Cell(0, 5, 'Dönem: ' . $baslangic . ' – ' . $bitis . $filtreMetin, 0, 1, 'L');
 $pdf->Ln(1);
 
 $colW = [18, 12, 26, 14, 12, 30, 14, 14, 14, 12, 18, 18];

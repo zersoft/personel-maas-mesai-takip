@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/functions.php';
 $pageTitle = 'Kantar Raporları';
 
 $rapor = isset($_GET['rapor']) ? $_GET['rapor'] : 'perakende';
-if (!in_array($rapor, ['perakende', 'ozet', 'ozet_malzeme', 'cari'], true)) {
+if (!in_array($rapor, ['perakende', 'ozet', 'ozet_malzeme', 'cari', 'kantar_takip', 'mizan'], true)) {
     $rapor = 'perakende';
 }
 
@@ -15,14 +15,25 @@ $periyot = isset($_GET['periyot']) ? $_GET['periyot'] : '';
 if ($periyot === '' && !isset($_GET['baslangic']) && !isset($_GET['bitis'])) {
     $periyot = 'bugun';
 }
-if ($periyot === 'bugun') {
+if ($periyot === 'dun') {
+    $baslangic = $bitis = date('Y-m-d', strtotime('-1 day'));
+} elseif ($periyot === 'bugun') {
     $baslangic = $bitis = $today;
+} elseif ($periyot === 'gecen_hafta') {
+    $baslangic = date('Y-m-d', strtotime('monday last week'));
+    $bitis = date('Y-m-d', strtotime('sunday last week'));
 } elseif ($periyot === 'bu_hafta') {
     $baslangic = date('Y-m-d', strtotime('monday this week'));
     $bitis = $today;
+} elseif ($periyot === 'gecen_ay') {
+    $baslangic = date('Y-m-01', strtotime('first day of last month'));
+    $bitis = date('Y-m-t', strtotime('last day of last month'));
 } elseif ($periyot === 'bu_ay') {
     $baslangic = date('Y-m-01');
     $bitis = $today;
+} elseif ($periyot === 'gecen_yil') {
+    $baslangic = date('Y-01-01', strtotime('first day of last year'));
+    $bitis = date('Y-12-31', strtotime('last day of last year'));
 } elseif ($periyot === 'bu_yil') {
     $baslangic = date('Y-01-01');
     $bitis = $today;
@@ -31,6 +42,12 @@ if ($periyot === 'bugun') {
     $bitis     = isset($_GET['bitis'])     ? $_GET['bitis']     : $today;
 }
 $musteri   = isset($_GET['musteri'])   ? trim($_GET['musteri']) : '';
+$plaka     = isset($_GET['plaka'])     ? trim($_GET['plaka']) : '';
+$cikis_firma = isset($_GET['cikis_firma']) ? (int)$_GET['cikis_firma'] : 0; // cikisFirmaID (Cari.CariID)
+$hareket   = isset($_GET['hareket']) ? trim($_GET['hareket']) : ''; // '' | satis | tahsilat
+if (!in_array($hareket, ['', 'satis', 'tahsilat'], true)) {
+    $hareket = '';
+}
 $cari_firma = isset($_GET['cari_firma']) ? trim($_GET['cari_firma']) : '';
 $ozet_bakiyesiz = isset($_GET['ozet_bakiyesiz']) ? (int)$_GET['ozet_bakiyesiz'] : 0; // 0 = bakiyesizleri gizle (varsayılan), 1 = göster
 $malzeme_bos_gizle = isset($_GET['malzeme_bos_gizle']) ? (int)$_GET['malzeme_bos_gizle'] : 0; // 0 = dönemde satışı olmayan malzemeyi gizle, 1 = tümünü göster
@@ -57,45 +74,234 @@ function formatSahaZaman($zamanDamgasi) {
 $liste = [];
 $toplamNetKg = 0;
 $toplamGenel = 0;
+$toplamSatisPerakende = 0;
+$toplamTahsilatPerakende = 0;
 $ozetListe = [];
 $ozetMalzemeListe = [];
 $cariListe = [];
 $cariDevir = null;
 $musteriListesi = [];
+$cikisFirmaListesi = []; // [cikisFirmaID => FirmaAdi]
+$kantarTakipOzet = []; // müşteri bazlı özet (kantar_takip raporu)
+$mizanListe = []; // mizan: devir, dönem satış/tahsilat, bakiye
+$cikisFirmaAdi = '';
 $raporDbHata = null;
 
 if ($pdoReport) {
     try {
-        // Müşteri listesi (cari ekstre dropdown)
+        // Müşteri listesi (cari ekstre / perakende dropdown)
         $musteriStmt = $pdoReport->query("SELECT DISTINCT FirmaAdi FROM SahadanSatis WHERE status = 1 AND FirmaAdi IS NOT NULL AND FirmaAdi != '' ORDER BY FirmaAdi");
         $musteriListesi = $musteriStmt->fetchAll(PDO::FETCH_COLUMN);
 
+        // Çıkış firması: aynı Cari tablosu (Tur = Grup Firma), cikisFirmaID = Cari.CariID
+        $cikisStmt = $pdoReport->query("
+            SELECT c.CariID AS id,
+                   COALESCE(NULLIF(TRIM(c.FirmaAdi), ''), CONCAT('ID ', c.CariID)) AS adi
+            FROM Cari c
+            WHERE c.status = 1
+              AND c.CariID > 0
+              AND c.Tur = 'Grup Firma'
+              AND c.FirmaAdi IS NOT NULL AND TRIM(c.FirmaAdi) != ''
+            ORDER BY adi
+        ");
+        foreach ($cikisStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $cid = (int)$row['id'];
+            if (!isset($cikisFirmaListesi[$cid])) {
+                $cikisFirmaListesi[$cid] = $row['adi'];
+            }
+        }
+        // SahadanSatis'te geçen ama listede olmayanları da ekle
+        $eksikStmt = $pdoReport->query("
+            SELECT DISTINCT s.cikisFirmaID AS id,
+                   COALESCE(NULLIF(TRIM(c.FirmaAdi), ''), CONCAT('ID ', s.cikisFirmaID)) AS adi
+            FROM SahadanSatis s
+            LEFT JOIN Cari c ON c.CariID = s.cikisFirmaID
+            WHERE s.status = 1 AND s.cikisFirmaID > 0
+        ");
+        foreach ($eksikStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $cid = (int)$row['id'];
+            if (!isset($cikisFirmaListesi[$cid])) {
+                $cikisFirmaListesi[$cid] = $row['adi'];
+            }
+        }
+        asort($cikisFirmaListesi, SORT_STRING | SORT_FLAG_CASE);
+
+        // Kantar Takip / Mizan: varsayılan çıkış firması = "KANTAR TAKİP"
+        if (($rapor === 'kantar_takip' || $rapor === 'mizan') && $cikis_firma <= 0) {
+            foreach ($cikisFirmaListesi as $cid => $adi) {
+                if (mb_strtoupper(trim($adi), 'UTF-8') === 'KANTAR TAKİP') {
+                    $cikis_firma = (int)$cid;
+                    break;
+                }
+            }
+            if ($cikis_firma <= 0 && !empty($cikisFirmaListesi)) {
+                // isimde "KANTAR" geçen ilk kayıt
+                foreach ($cikisFirmaListesi as $cid => $adi) {
+                    if (stripos($adi, 'KANTAR') !== false) {
+                        $cikis_firma = (int)$cid;
+                        break;
+                    }
+                }
+            }
+        }
+        if ($cikis_firma > 0 && isset($cikisFirmaListesi[$cikis_firma])) {
+            $cikisFirmaAdi = $cikisFirmaListesi[$cikis_firma];
+        }
+
         if ($rapor === 'perakende') {
             $sql = "SELECT id, FirmaAdi, plaka, dokumTipi, dokumNetKg, brimFiyat, dokumTutar, kdv, genelTutar,
-                           irsaliyeNo, irsaliyeSeri, islemTipi, tarih, islemZamanDamgasi
+                           irsaliyeNo, irsaliyeSeri, islemTipi, tarih, islemZamanDamgasi, cikisFirmaID
                     FROM SahadanSatis WHERE status = 1 AND tarih BETWEEN ? AND ?";
             $params = [$tarihBas, $tarihBit];
             if ($musteri !== '') {
-                $sql .= " AND (FirmaAdi LIKE ? OR plaka LIKE ?)";
-                $params[] = '%' . $musteri . '%';
-                $params[] = '%' . $musteri . '%';
+                $sql .= " AND FirmaAdi = ?";
+                $params[] = $musteri;
+            }
+            if ($plaka !== '') {
+                $sql .= " AND plaka LIKE ?";
+                $params[] = '%' . $plaka . '%';
+            }
+            if ($hareket === 'satis') {
+                $sql .= " AND islemTipi = 'GELİR TAHAKKUK'";
+                if ($cikis_firma > 0) {
+                    $sql .= " AND cikisFirmaID = ?";
+                    $params[] = $cikis_firma;
+                }
+            } elseif ($hareket === 'tahsilat') {
+                $sql .= " AND islemTipi = 'GELİR TAHSİLAT'";
+            } elseif ($cikis_firma > 0) {
+                // Tahsilat kayıtlarında cikisFirmaID genelde 0; çıkış filtresinde GELİR TAHSİLAT her zaman dahil
+                $sql .= " AND (cikisFirmaID = ? OR islemTipi = 'GELİR TAHSİLAT')";
+                $params[] = $cikis_firma;
             }
             $sql .= " ORDER BY tarih DESC, islemZamanDamgasi DESC";
             $stmt = $pdoReport->prepare($sql);
             $stmt->execute($params);
             $liste = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            $toplamSatisPerakende = 0;   // DB'de satış eksi olarak toplanacak
-            $toplamTahsilatPerakende = 0; // DB'de tahsilat artı
             foreach ($liste as $r) {
                 $gt = (float)($r['genelTutar'] ?? 0);
                 if (isset($r['islemTipi']) && $r['islemTipi'] === 'GELİR TAHSİLAT') {
                     $toplamTahsilatPerakende += $gt;
                 } else {
-                    $toplamSatisPerakende += $gt; // TAHAKKUK = satış, DB'de eksi
+                    $toplamSatisPerakende += $gt;
                 }
                 $toplamNetKg += (float)($r['dokumNetKg'] ?? 0);
                 $toplamGenel += $gt;
             }
+        } elseif ($rapor === 'kantar_takip' && $cikis_firma > 0) {
+            // Hareket listesi (çıkış firmasına göre)
+            $sql = "SELECT id, FirmaAdi, plaka, dokumTipi, dokumNetKg, brimFiyat, dokumTutar, kdv, genelTutar,
+                           irsaliyeNo, irsaliyeSeri, islemTipi, tarih, islemZamanDamgasi, cikisFirmaID
+                    FROM SahadanSatis
+                    WHERE status = 1 AND tarih BETWEEN ? AND ?";
+            $params = [$tarihBas, $tarihBit];
+            if ($hareket === 'satis') {
+                $sql .= " AND islemTipi = 'GELİR TAHAKKUK' AND cikisFirmaID = ?";
+                $params[] = $cikis_firma;
+            } elseif ($hareket === 'tahsilat') {
+                $sql .= " AND islemTipi = 'GELİR TAHSİLAT'";
+            } else {
+                $sql .= " AND (cikisFirmaID = ? OR islemTipi = 'GELİR TAHSİLAT')";
+                $params[] = $cikis_firma;
+            }
+            if ($musteri !== '') {
+                $sql .= " AND FirmaAdi = ?";
+                $params[] = $musteri;
+            }
+            $sql .= " ORDER BY tarih DESC, islemZamanDamgasi DESC";
+            $stmt = $pdoReport->prepare($sql);
+            $stmt->execute($params);
+            $liste = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($liste as $r) {
+                $gt = (float)($r['genelTutar'] ?? 0);
+                if (isset($r['islemTipi']) && $r['islemTipi'] === 'GELİR TAHSİLAT') {
+                    $toplamTahsilatPerakende += $gt;
+                } else {
+                    // Sadece seçili çıkış firmasının satışları
+                    if ((int)($r['cikisFirmaID'] ?? 0) === $cikis_firma) {
+                        $toplamSatisPerakende += $gt;
+                        $toplamNetKg += (float)($r['dokumNetKg'] ?? 0);
+                    }
+                    $toplamGenel += $gt;
+                }
+                if (isset($r['islemTipi']) && $r['islemTipi'] === 'GELİR TAHSİLAT') {
+                    $toplamGenel += $gt;
+                }
+            }
+
+            // Müşteri bazlı özet: satış = bu çıkış firması; tahsilat = müşterinin tüm tahsilatı
+            $sqlOzet = "SELECT FirmaAdi,
+                    SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND cikisFirmaID = ? AND tarih >= ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS toplam_satis,
+                    SUM(CASE WHEN islemTipi = 'GELİR TAHSİLAT' AND tarih >= ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS toplam_tahsilat,
+                    SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND cikisFirmaID = ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS genel_satis,
+                    SUM(CASE WHEN islemTipi = 'GELİR TAHSİLAT' AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS genel_tahsilat,
+                    SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND cikisFirmaID = ? AND tarih >= ? AND tarih <= ? THEN COALESCE(dokumNetKg,0) ELSE 0 END) AS donem_net_kg
+                    FROM SahadanSatis
+                    WHERE status = 1 AND tarih <= ?
+                      AND (cikisFirmaID = ? OR islemTipi = 'GELİR TAHSİLAT')
+                    GROUP BY FirmaAdi ORDER BY FirmaAdi";
+            $stmtOzet = $pdoReport->prepare($sqlOzet);
+            $stmtOzet->execute([
+                $cikis_firma, $tarihBas, $tarihBit,
+                $tarihBas, $tarihBit,
+                $cikis_firma, $tarihBit,
+                $tarihBit,
+                $cikis_firma, $tarihBas, $tarihBit,
+                $tarihBit, $cikis_firma
+            ]);
+            $kantarTakipOzet = $stmtOzet->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($kantarTakipOzet as &$o) {
+                $o['bakiye'] = (float)($o['genel_satis'] ?? 0) + (float)($o['genel_tahsilat'] ?? 0);
+            }
+            unset($o);
+            // Dönemde bu çıkış firmasında satışı veya tahsilatı olanlar
+            $kantarTakipOzet = array_values(array_filter($kantarTakipOzet, function ($o) {
+                return (float)$o['toplam_satis'] != 0 || (float)$o['toplam_tahsilat'] != 0;
+            }));
+        } elseif ($rapor === 'mizan' && $cikis_firma > 0) {
+            // Mizan: Devir | Dönem Satış (aldığı) | Dönem Tahsilat (ödediği) | Kümülatif Bakiye
+            // Satış: cikisFirmaID; Tahsilat: her zaman (cikisFirmaID genelde 0)
+            $sqlMizan = "SELECT FirmaAdi,
+                    SUM(CASE WHEN tarih < ? AND ((islemTipi = 'GELİR TAHAKKUK' AND cikisFirmaID = ?) OR islemTipi = 'GELİR TAHSİLAT')
+                        THEN COALESCE(genelTutar,0) ELSE 0 END) AS devir,
+                    SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND cikisFirmaID = ? AND tarih >= ? AND tarih <= ?
+                        THEN COALESCE(genelTutar,0) ELSE 0 END) AS donem_satis,
+                    SUM(CASE WHEN islemTipi = 'GELİR TAHSİLAT' AND tarih >= ? AND tarih <= ?
+                        THEN COALESCE(genelTutar,0) ELSE 0 END) AS donem_tahsilat,
+                    SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND cikisFirmaID = ? AND tarih >= ? AND tarih <= ?
+                        THEN COALESCE(dokumNetKg,0) ELSE 0 END) AS donem_net_kg
+                    FROM SahadanSatis
+                    WHERE status = 1
+                      AND (cikisFirmaID = ? OR islemTipi = 'GELİR TAHSİLAT')";
+            $paramsMizan = [
+                $tarihDevirBit, $cikis_firma,
+                $cikis_firma, $tarihBas, $tarihBit,
+                $tarihBas, $tarihBit,
+                $cikis_firma, $tarihBas, $tarihBit,
+                $cikis_firma
+            ];
+            if ($musteri !== '') {
+                $sqlMizan .= " AND FirmaAdi = ?";
+                $paramsMizan[] = $musteri;
+            }
+            $sqlMizan .= " GROUP BY FirmaAdi ORDER BY FirmaAdi";
+            $stmtMizan = $pdoReport->prepare($sqlMizan);
+            $stmtMizan->execute($paramsMizan);
+            $mizanListe = $stmtMizan->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($mizanListe as &$m) {
+                $devir = (float)($m['devir'] ?? 0);
+                $ds = (float)($m['donem_satis'] ?? 0);
+                $dt = (float)($m['donem_tahsilat'] ?? 0);
+                $m['bakiye'] = $devir + $ds + $dt;
+            }
+            unset($m);
+            // Sıfır satırları gizle
+            $mizanListe = array_values(array_filter($mizanListe, function ($m) {
+                return abs((float)$m['devir']) > 0.0001
+                    || abs((float)$m['donem_satis']) > 0.0001
+                    || abs((float)$m['donem_tahsilat']) > 0.0001
+                    || abs((float)$m['bakiye']) > 0.0001;
+            }));
         } elseif ($rapor === 'ozet') {
             // İlk iki sütun: seçili tarih aralığı (baslangic–bitis). Genel: baştan seçili son tarihe (bitis) kadar. Bakiye = genel bakiye (eksi = müşteri borçlu).
             $sql = "SELECT FirmaAdi,
@@ -180,7 +386,13 @@ include __DIR__ . '/../includes/header.php';
 
     <ul class="nav nav-tabs mb-3" role="tablist">
         <li class="nav-item">
-            <a class="nav-link <?php echo $rapor === 'perakende' ? 'active' : ''; ?>" href="?rapor=perakende&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&musteri=<?php echo urlencode($musteri); ?>"><i class="bi bi-cart-check"></i> Perakende Satış</a>
+            <a class="nav-link <?php echo $rapor === 'perakende' ? 'active' : ''; ?>" href="?rapor=perakende&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&musteri=<?php echo urlencode($musteri); ?>&plaka=<?php echo urlencode($plaka); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&hareket=<?php echo urlencode($hareket); ?>"><i class="bi bi-cart-check"></i> Perakende Satış</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $rapor === 'kantar_takip' ? 'active' : ''; ?>" href="?rapor=kantar_takip&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&hareket=<?php echo urlencode($hareket); ?>"><i class="bi bi-cash-coin"></i> Kantar Takip</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $rapor === 'mizan' ? 'active' : ''; ?>" href="?rapor=mizan&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>"><i class="bi bi-balance-scale"></i> Mizan</a>
         </li>
         <li class="nav-item">
             <a class="nav-link <?php echo $rapor === 'ozet' ? 'active' : ''; ?>" href="?rapor=ozet&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&ozet_bakiyesiz=<?php echo (int)$ozet_bakiyesiz; ?>"><i class="bi bi-pie-chart"></i> Özet Rapor</a>
@@ -194,69 +406,95 @@ include __DIR__ . '/../includes/header.php';
     </ul>
 
     <!-- Tarih / periyot seçimi (ortak) -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-body py-3">
-            <form method="get" class="row g-3 align-items-end">
-                <input type="hidden" name="rapor" value="<?php echo htmlspecialchars($rapor); ?>">
-                <?php if ($rapor === 'ozet'): ?>
-                <input type="hidden" name="ozet_bakiyesiz" value="<?php echo (int)$ozet_bakiyesiz; ?>">
-                <?php endif; ?>
-                <?php if ($rapor === 'ozet_malzeme'): ?>
-                <input type="hidden" name="malzeme_bos_gizle" value="<?php echo (int)$malzeme_bos_gizle; ?>">
-                <?php endif; ?>
-                <div class="col-auto">
-                    <label class="form-label small mb-0">Periyot</label>
-                    <div class="btn-group btn-group-sm">
-                        <?php
-                        $periyotSuffix = ($rapor === 'cari' && $cari_firma !== '') ? '&cari_firma=' . urlencode($cari_firma) : '';
-                        if ($rapor === 'ozet') $periyotSuffix .= '&ozet_bakiyesiz=' . (int)$ozet_bakiyesiz;
-                        if ($rapor === 'ozet_malzeme') $periyotSuffix .= '&malzeme_bos_gizle=' . (int)$malzeme_bos_gizle;
-                        ?>
-                        <a href="?rapor=<?php echo $rapor; ?>&periyot=bugun<?php echo $periyotSuffix; ?>" class="btn <?php echo $periyot === 'bugun' ? 'btn-primary' : 'btn-outline-secondary'; ?>">Bugün</a>
-                        <a href="?rapor=<?php echo $rapor; ?>&periyot=bu_hafta<?php echo $periyotSuffix; ?>" class="btn <?php echo $periyot === 'bu_hafta' ? 'btn-primary' : 'btn-outline-secondary'; ?>">Bu Hafta</a>
-                        <a href="?rapor=<?php echo $rapor; ?>&periyot=bu_ay<?php echo $periyotSuffix; ?>" class="btn <?php echo $periyot === 'bu_ay' ? 'btn-primary' : 'btn-outline-secondary'; ?>">Bu Ay</a>
-                        <a href="?rapor=<?php echo $rapor; ?>&periyot=bu_yil<?php echo $periyotSuffix; ?>" class="btn <?php echo $periyot === 'bu_yil' ? 'btn-primary' : 'btn-outline-secondary'; ?>">Bu Yıl</a>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label small">Başlangıç</label>
-                    <input type="date" name="baslangic" class="form-control form-control-sm" value="<?php echo htmlspecialchars($baslangic); ?>">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label small">Bitiş</label>
-                    <input type="date" name="bitis" class="form-control form-control-sm" value="<?php echo htmlspecialchars($bitis); ?>">
-                </div>
+    <?php
+    $periyotSuffix = ($rapor === 'cari' && $cari_firma !== '') ? '&cari_firma=' . urlencode($cari_firma) : '';
+    if ($rapor === 'perakende') {
+        if ($musteri !== '') $periyotSuffix .= '&musteri=' . urlencode($musteri);
+        if ($plaka !== '') $periyotSuffix .= '&plaka=' . urlencode($plaka);
+        if ($cikis_firma > 0) $periyotSuffix .= '&cikis_firma=' . (int)$cikis_firma;
+        if ($hareket !== '') $periyotSuffix .= '&hareket=' . urlencode($hareket);
+    }
+    if ($rapor === 'kantar_takip' || $rapor === 'mizan') {
+        if ($cikis_firma > 0) $periyotSuffix .= '&cikis_firma=' . (int)$cikis_firma;
+        if ($musteri !== '') $periyotSuffix .= '&musteri=' . urlencode($musteri);
+        if ($rapor === 'kantar_takip' && $hareket !== '') $periyotSuffix .= '&hareket=' . urlencode($hareket);
+    }
+    if ($rapor === 'ozet') $periyotSuffix .= '&ozet_bakiyesiz=' . (int)$ozet_bakiyesiz;
+    if ($rapor === 'ozet_malzeme') $periyotSuffix .= '&malzeme_bos_gizle=' . (int)$malzeme_bos_gizle;
+    $periyotlar = [
+        'dun' => 'Dün', 'bugun' => 'Bugün',
+        'gecen_hafta' => 'Geçen Hafta', 'bu_hafta' => 'Bu Hafta',
+        'gecen_ay' => 'Geçen Ay', 'bu_ay' => 'Bu Ay',
+        'gecen_yil' => 'Geçen Yıl', 'bu_yil' => 'Bu Yıl',
+    ];
+    ?>
+    <div class="d-flex flex-wrap align-items-center gap-1 mb-3" style="font-size:.75rem">
+        <?php foreach ($periyotlar as $p => $label): ?>
+        <a href="?rapor=<?php echo $rapor; ?>&periyot=<?php echo $p; ?><?php echo $periyotSuffix; ?>" class="btn <?php echo $periyot === $p ? 'btn-dark' : 'btn-outline-secondary'; ?>" style="padding:.2rem .5rem;font-size:.75rem;line-height:1.3"><?php echo $label; ?></a>
+        <?php endforeach; ?>
+        <span class="text-muted mx-1">|</span>
+        <form method="get" class="d-flex align-items-center gap-1 flex-wrap">
+            <input type="hidden" name="rapor" value="<?php echo htmlspecialchars($rapor); ?>">
+            <?php if ($rapor === 'ozet'): ?>
+            <input type="hidden" name="ozet_bakiyesiz" value="<?php echo (int)$ozet_bakiyesiz; ?>">
+            <?php endif; ?>
+            <?php if ($rapor === 'ozet_malzeme'): ?>
+            <input type="hidden" name="malzeme_bos_gizle" value="<?php echo (int)$malzeme_bos_gizle; ?>">
+            <?php endif; ?>
+            <input type="date" name="baslangic" class="form-control form-control-sm" style="width:auto" value="<?php echo htmlspecialchars($baslangic); ?>">
+            <span class="text-muted">–</span>
+            <input type="date" name="bitis" class="form-control form-control-sm" style="width:auto" value="<?php echo htmlspecialchars($bitis); ?>">
+            <?php if ($rapor === 'perakende' || $rapor === 'kantar_takip' || $rapor === 'mizan'): ?>
+            <select name="cikis_firma" class="form-select form-select-sm" style="width:200px" title="Çıkış firması (Cari / Grup Firma)">
                 <?php if ($rapor === 'perakende'): ?>
-                <div class="col-md-2">
-                    <label class="form-label small">Müşteri / Plaka</label>
-                    <input type="text" name="musteri" class="form-control form-control-sm" value="<?php echo htmlspecialchars($musteri); ?>" placeholder="Müşteri veya plaka ara">
-                </div>
+                <option value="0">-- Tüm çıkış firmaları --</option>
+                <?php else: ?>
+                <option value="0">-- Çıkış firması seçin --</option>
                 <?php endif; ?>
-                <?php if ($rapor === 'cari'): ?>
-                <div class="col-md-3">
-                    <label class="form-label small">Müşteri (Cari)</label>
-                    <select name="cari_firma" id="cariFirmaSelect" class="form-select form-select-sm">
-                        <option value="">-- Müşteri ara veya seçin --</option>
-                        <?php foreach ($musteriListesi as $f): ?>
-                            <option value="<?php echo htmlspecialchars($f); ?>" <?php echo $cari_firma === $f ? 'selected' : ''; ?>><?php echo htmlspecialchars($f); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <?php endif; ?>
-                <div class="col-auto">
-                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Uygula</button>
-                    <?php if ($rapor === 'perakende'): ?>
-                    <a href="kantar_perakende_pdf.php?baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&musteri=<?php echo urlencode($musteri); ?>" target="_blank" class="btn btn-sm btn-outline-danger ms-1"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
-                    <?php elseif ($rapor === 'ozet'): ?>
-                    <a href="kantar_ozet_pdf.php?baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&ozet_bakiyesiz=<?php echo (int)$ozet_bakiyesiz; ?>" target="_blank" class="btn btn-sm btn-outline-danger ms-1"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
-                    <?php elseif ($rapor === 'ozet_malzeme'): ?>
-                    <a href="kantar_ozet_malzeme_pdf.php?baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&malzeme_bos_gizle=<?php echo (int)$malzeme_bos_gizle; ?>" target="_blank" class="btn btn-sm btn-outline-danger ms-1"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
-                    <?php elseif ($rapor === 'cari'): ?>
-                    <a href="kantar_cari_ekstre_pdf.php?cari_firma=<?php echo urlencode($cari_firma); ?>&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>" target="_blank" class="btn btn-sm btn-outline-danger ms-1 <?php echo $cari_firma === '' ? 'disabled' : ''; ?>"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
-                    <?php endif; ?>
-                </div>
-            </form>
-        </div>
+                <?php foreach ($cikisFirmaListesi as $cid => $adi): ?>
+                    <option value="<?php echo (int)$cid; ?>" <?php echo $cikis_firma === (int)$cid ? 'selected' : ''; ?>><?php echo htmlspecialchars($adi); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select name="musteri" class="form-select form-select-sm" style="width:180px" title="Müşteri (Cari)">
+                <option value="">-- Tüm müşteriler --</option>
+                <?php foreach ($musteriListesi as $f): ?>
+                    <option value="<?php echo htmlspecialchars($f); ?>" <?php echo $musteri === $f ? 'selected' : ''; ?>><?php echo htmlspecialchars($f); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+            <?php if ($rapor === 'perakende'): ?>
+            <input type="text" name="plaka" class="form-control form-control-sm" style="width:120px" value="<?php echo htmlspecialchars($plaka); ?>" placeholder="Plaka">
+            <?php endif; ?>
+            <?php if ($rapor === 'perakende' || $rapor === 'kantar_takip'): ?>
+            <select name="hareket" class="form-select form-select-sm" style="width:130px" title="Hareket / İşlem türü">
+                <option value="">-- Tüm hareketler --</option>
+                <option value="satis" <?php echo $hareket === 'satis' ? 'selected' : ''; ?>>Satış</option>
+                <option value="tahsilat" <?php echo $hareket === 'tahsilat' ? 'selected' : ''; ?>>Tahsilat</option>
+            </select>
+            <?php endif; ?>
+            <?php if ($rapor === 'cari'): ?>
+            <select name="cari_firma" id="cariFirmaSelect" class="form-select form-select-sm" style="width:200px">
+                <option value="">-- Müşteri seçin --</option>
+                <?php foreach ($musteriListesi as $f): ?>
+                    <option value="<?php echo htmlspecialchars($f); ?>" <?php echo $cari_firma === $f ? 'selected' : ''; ?>><?php echo htmlspecialchars($f); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i></button>
+            <?php if ($rapor === 'perakende'): ?>
+            <a href="kantar_perakende_pdf.php?baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&musteri=<?php echo urlencode($musteri); ?>&plaka=<?php echo urlencode($plaka); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&hareket=<?php echo urlencode($hareket); ?>" target="_blank" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-earmark-pdf"></i></a>
+            <?php elseif ($rapor === 'kantar_takip'): ?>
+            <a href="kantar_takip_pdf.php?baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&musteri=<?php echo urlencode($musteri); ?>&hareket=<?php echo urlencode($hareket); ?>" target="_blank" class="btn btn-sm btn-outline-danger <?php echo $cikis_firma <= 0 ? 'disabled' : ''; ?>"><i class="bi bi-file-earmark-pdf"></i></a>
+            <?php elseif ($rapor === 'mizan'): ?>
+            <a href="kantar_mizan_pdf.php?baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&musteri=<?php echo urlencode($musteri); ?>" target="_blank" class="btn btn-sm btn-outline-danger <?php echo $cikis_firma <= 0 ? 'disabled' : ''; ?>"><i class="bi bi-file-earmark-pdf"></i></a>
+            <?php elseif ($rapor === 'ozet'): ?>
+            <a href="kantar_ozet_pdf.php?baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&ozet_bakiyesiz=<?php echo (int)$ozet_bakiyesiz; ?>" target="_blank" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-earmark-pdf"></i></a>
+            <?php elseif ($rapor === 'ozet_malzeme'): ?>
+            <a href="kantar_ozet_malzeme_pdf.php?baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&malzeme_bos_gizle=<?php echo (int)$malzeme_bos_gizle; ?>" target="_blank" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-earmark-pdf"></i></a>
+            <?php elseif ($rapor === 'cari'): ?>
+            <a href="kantar_cari_ekstre_pdf.php?cari_firma=<?php echo urlencode($cari_firma); ?>&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>" target="_blank" class="btn btn-sm btn-outline-danger <?php echo $cari_firma === '' ? 'disabled' : ''; ?>"><i class="bi bi-file-earmark-pdf"></i></a>
+            <?php endif; ?>
+        </form>
     </div>
 
     <?php if ($raporDbHata): ?>
@@ -316,6 +554,227 @@ include __DIR__ . '/../includes/header.php';
                 <?php if (empty($liste)): ?><p class="text-muted mb-0">Kayıt yok.</p><?php endif; ?>
             </div>
         </div>
+    <?php endif; ?>
+
+    <!-- Kantar Takip (cikisFirmaID bazlı parasal takip) -->
+    <?php if ($rapor === 'kantar_takip' && !$raporDbHata): ?>
+        <?php if ($cikis_firma <= 0): ?>
+        <div class="alert alert-info mb-0"><i class="bi bi-info-circle"></i> Lütfen çıkış firması seçin. (Varsayılan: Kantar Takip)</div>
+        <?php else: ?>
+        <div class="alert alert-secondary py-2 small mb-3">
+            <i class="bi bi-building"></i> Çıkış firması: <strong><?php echo htmlspecialchars($cikisFirmaAdi !== '' ? $cikisFirmaAdi : ('ID ' . $cikis_firma)); ?></strong>
+            — Bu raporda malzemenin hangi firmadan çıktığına göre satış ve tahsilat takibi yapılır.
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="card bg-light border-0 h-100">
+                    <div class="card-body py-3">
+                        <div class="text-muted small">Dönem Satış</div>
+                        <div class="fs-5 fw-bold"><?php echo number_format(abs($toplamSatisPerakende), 2, ',', '.'); ?> ₺</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light border-0 h-100">
+                    <div class="card-body py-3">
+                        <div class="text-muted small">Dönem Tahsilat</div>
+                        <div class="fs-5 fw-bold text-success"><?php echo number_format($toplamTahsilatPerakende, 2, ',', '.'); ?> ₺</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light border-0 h-100">
+                    <div class="card-body py-3">
+                        <div class="text-muted small">Dönem Net Tonaj</div>
+                        <div class="fs-5 fw-bold"><?php echo number_format($toplamNetKg, 0, ',', '.'); ?> kg</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-people"></i> Müşteri Özeti (Çıkış: <?php echo htmlspecialchars($cikisFirmaAdi !== '' ? $cikisFirmaAdi : (string)$cikis_firma); ?>)</h6>
+                <p class="text-muted small mb-2">Dönem satış/tahsilatı olan müşteriler. Bakiye = genel satış + genel tahsilat (eksi = müşteri borçlu).</p>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Müşteri</th>
+                                <th class="text-end">Dönem Satış (₺)</th>
+                                <th class="text-end">Dönem Tahsilat (₺)</th>
+                                <th class="text-end">Dönem Net (kg)</th>
+                                <th class="text-end">Genel Satış (₺)</th>
+                                <th class="text-end">Genel Tahsilat (₺)</th>
+                                <th class="text-end">Bakiye (₺)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $sumSatis = 0; $sumTahsilat = 0; $sumKg = 0; $sumGenSatis = 0; $sumGenTahsilat = 0;
+                            foreach ($kantarTakipOzet as $o):
+                                $sumSatis += (float)$o['toplam_satis'];
+                                $sumTahsilat += (float)$o['toplam_tahsilat'];
+                                $sumKg += (float)($o['donem_net_kg'] ?? 0);
+                                $sumGenSatis += (float)($o['genel_satis'] ?? 0);
+                                $sumGenTahsilat += (float)($o['genel_tahsilat'] ?? 0);
+                            ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($o['FirmaAdi'] ?? '-'); ?></td>
+                                <td class="text-end"><?php echo number_format((float)$o['toplam_satis'], 2, ',', '.'); ?></td>
+                                <td class="text-end"><?php echo number_format((float)$o['toplam_tahsilat'], 2, ',', '.'); ?></td>
+                                <td class="text-end"><?php echo number_format((float)($o['donem_net_kg'] ?? 0), 0, ',', '.'); ?></td>
+                                <td class="text-end"><?php echo number_format((float)($o['genel_satis'] ?? 0), 2, ',', '.'); ?></td>
+                                <td class="text-end"><?php echo number_format((float)($o['genel_tahsilat'] ?? 0), 2, ',', '.'); ?></td>
+                                <td class="text-end fw-bold <?php echo (float)$o['bakiye'] < 0 ? 'text-danger' : ((float)$o['bakiye'] > 0 ? 'text-success' : ''); ?>"><?php echo number_format((float)$o['bakiye'], 2, ',', '.'); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <?php if (!empty($kantarTakipOzet)): ?>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th>Toplam</th>
+                                <th class="text-end"><?php echo number_format($sumSatis, 2, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format($sumTahsilat, 2, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format($sumKg, 0, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format($sumGenSatis, 2, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format($sumGenTahsilat, 2, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format($sumGenSatis + $sumGenTahsilat, 2, ',', '.'); ?></th>
+                            </tr>
+                        </tfoot>
+                        <?php endif; ?>
+                    </table>
+                </div>
+                <?php if (empty($kantarTakipOzet)): ?><p class="text-muted mb-0">Seçili dönemde müşteri hareketi yok.</p><?php endif; ?>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-list-ul"></i> Hareket Listesi</h6>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tarih</th><th>Saat</th><th>Müşteri</th><th>Plaka</th><th>Hareket</th><th>Döküm Tipi</th>
+                                <th class="text-end">Net (kg)</th><th class="text-end">Birim Fiyat</th><th class="text-end">Tutar</th><th class="text-end">KDV</th><th class="text-end">Tutar (₺)</th><th>İrsaliye</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($liste as $r):
+                                $isTahsilat = (isset($r['islemTipi']) && $r['islemTipi'] === 'GELİR TAHSİLAT');
+                                $gt = (float)($r['genelTutar'] ?? 0);
+                                $dt = (float)($r['dokumTutar'] ?? 0);
+                                $kdv = (float)($r['kdv'] ?? 0);
+                            ?>
+                                <tr>
+                                    <td><?php echo formatSahaTarih($r['tarih'] ?? null); ?></td>
+                                    <td><?php echo formatSahaZaman($r['islemZamanDamgasi'] ?? null); ?></td>
+                                    <td><?php echo htmlspecialchars($r['FirmaAdi'] ?? '-'); ?></td>
+                                    <td><?php echo htmlspecialchars($r['plaka'] ?? '-'); ?></td>
+                                    <td><span class="badge <?php echo $isTahsilat ? 'bg-success' : 'bg-primary'; ?>"><?php echo $isTahsilat ? 'Tahsilat' : 'Satış'; ?></span></td>
+                                    <td><?php echo htmlspecialchars($r['dokumTipi'] ?? '-'); ?></td>
+                                    <td class="text-end"><?php echo number_format((float)($r['dokumNetKg'] ?? 0), 0, ',', '.'); ?></td>
+                                    <td class="text-end"><?php echo number_format((float)($r['brimFiyat'] ?? 0), 2, ',', '.'); ?></td>
+                                    <td class="text-end"><?php echo number_format($dt, 2, ',', '.'); ?></td>
+                                    <td class="text-end"><?php echo number_format($kdv, 2, ',', '.'); ?></td>
+                                    <td class="text-end"><?php echo number_format($gt, 2, ',', '.'); ?></td>
+                                    <td><?php echo htmlspecialchars(($r['irsaliyeSeri'] ?? '') . ($r['irsaliyeNo'] ?? '')); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <?php if (!empty($liste)): ?>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th colspan="6" class="text-end">Özet</th>
+                                <th class="text-end"><?php echo number_format($toplamNetKg, 0, ',', '.'); ?></th>
+                                <th colspan="2"></th>
+                                <th class="text-end">Satış: <?php echo number_format($toplamSatisPerakende, 2, ',', '.'); ?></th>
+                                <th class="text-end">Tahsilat: <?php echo number_format($toplamTahsilatPerakende, 2, ',', '.'); ?></th>
+                                <th></th>
+                            </tr>
+                        </tfoot>
+                        <?php endif; ?>
+                    </table>
+                </div>
+                <?php if (empty($liste)): ?><p class="text-muted mb-0">Kayıt yok.</p><?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+    <?php endif; ?>
+
+    <!-- Mizan (devir + dönem satış/tahsilat + kümülatif bakiye) -->
+    <?php if ($rapor === 'mizan' && !$raporDbHata): ?>
+        <?php if ($cikis_firma <= 0): ?>
+        <div class="alert alert-info mb-0"><i class="bi bi-info-circle"></i> Lütfen çıkış firması seçin. (Varsayılan: Kantar Takip)</div>
+        <?php else: ?>
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-balance-scale"></i> Mizan — <?php echo htmlspecialchars($cikisFirmaAdi !== '' ? $cikisFirmaAdi : ('ID ' . $cikis_firma)); ?></h6>
+                <p class="text-muted small mb-2">
+                    Dönem: <strong><?php echo htmlspecialchars($baslangic); ?></strong> – <strong><?php echo htmlspecialchars($bitis); ?></strong>.
+                    <strong>Devir:</strong> dönem başı bakiyesi ·
+                    <strong>Aldığı:</strong> dönem satış (TAHAKKUK) ·
+                    <strong>Ödediği:</strong> dönem tahsilat ·
+                    <strong>Bakiye:</strong> Devir + Aldığı + Ödediği (eksi = müşteri borçlu).
+                    Tahsilatlar çıkış firması filtresinden bağımsız olarak dahildir.
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Müşteri (Firma)</th>
+                                <th class="text-end">Devir (₺)</th>
+                                <th class="text-end">Aldığı / Satış (₺)</th>
+                                <th class="text-end">Ödediği / Tahsilat (₺)</th>
+                                <th class="text-end">Dönem Net (kg)</th>
+                                <th class="text-end">Kümülatif Bakiye (₺)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $sumDevir = 0; $sumAldi = 0; $sumOdedi = 0; $sumKg = 0; $sumBakiye = 0;
+                            foreach ($mizanListe as $m):
+                                $devir = (float)($m['devir'] ?? 0);
+                                $aldi = (float)($m['donem_satis'] ?? 0);
+                                $odedi = (float)($m['donem_tahsilat'] ?? 0);
+                                $kg = (float)($m['donem_net_kg'] ?? 0);
+                                $bakiye = (float)($m['bakiye'] ?? 0);
+                                $sumDevir += $devir;
+                                $sumAldi += $aldi;
+                                $sumOdedi += $odedi;
+                                $sumKg += $kg;
+                                $sumBakiye += $bakiye;
+                            ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($m['FirmaAdi'] ?? '-'); ?></td>
+                                <td class="text-end"><?php echo number_format($devir, 2, ',', '.'); ?></td>
+                                <td class="text-end"><?php echo number_format($aldi, 2, ',', '.'); ?></td>
+                                <td class="text-end"><?php echo number_format($odedi, 2, ',', '.'); ?></td>
+                                <td class="text-end"><?php echo number_format($kg, 0, ',', '.'); ?></td>
+                                <td class="text-end fw-bold <?php echo $bakiye < 0 ? 'text-danger' : ($bakiye > 0 ? 'text-success' : ''); ?>"><?php echo number_format($bakiye, 2, ',', '.'); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <?php if (!empty($mizanListe)): ?>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th>Toplam</th>
+                                <th class="text-end"><?php echo number_format($sumDevir, 2, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format($sumAldi, 2, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format($sumOdedi, 2, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format($sumKg, 0, ',', '.'); ?></th>
+                                <th class="text-end"><?php echo number_format($sumBakiye, 2, ',', '.'); ?></th>
+                            </tr>
+                        </tfoot>
+                        <?php endif; ?>
+                    </table>
+                </div>
+                <?php if (empty($mizanListe)): ?><p class="text-muted mb-0">Seçili filtrelerde mizan kaydı yok.</p><?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
     <?php endif; ?>
 
     <!-- Özet Rapor -->
