@@ -24,6 +24,11 @@ require_once $tcpdfPath;
 $cari_firma = isset($_GET['cari_firma']) ? trim((string)$_GET['cari_firma']) : '';
 $baslangic   = isset($_GET['baslangic']) ? $_GET['baslangic'] : date('Y-m-01');
 $bitis       = isset($_GET['bitis'])     ? $_GET['bitis']     : date('Y-m-d');
+$cikis_firma = isset($_GET['cikis_firma']) ? (int)$_GET['cikis_firma'] : 0;
+$hareket     = isset($_GET['hareket']) ? trim((string)$_GET['hareket']) : '';
+if (!in_array($hareket, ['', 'satis', 'tahsilat'], true)) {
+    $hareket = '';
+}
 
 if ($cari_firma === '' || !$pdoReport) {
     if (ob_get_level()) ob_end_clean();
@@ -48,13 +53,53 @@ function pdfFormatSahaZaman($zamanDamgasi) {
     return $s;
 }
 
+$cikisFirmaAdi = '';
+if ($cikis_firma > 0) {
+    try {
+        $st = $pdoReport->prepare("SELECT COALESCE(NULLIF(TRIM(FirmaAdi),''), CONCAT('ID ', ?)) FROM Cari WHERE CariID = ? LIMIT 1");
+        $st->execute([$cikis_firma, $cikis_firma]);
+        $cikisFirmaAdi = (string)($st->fetchColumn() ?: ('ID ' . $cikis_firma));
+    } catch (PDOException $e) {
+        $cikisFirmaAdi = 'ID ' . $cikis_firma;
+    }
+}
+
 try {
-    $devirStmt = $pdoReport->prepare("SELECT SUM(COALESCE(genelTutar,0)) AS devir FROM SahadanSatis WHERE status = 1 AND FirmaAdi = ? AND tarih < ?");
-    $devirStmt->execute([$cari_firma, $tarihDevirBit]);
+    $devirSql = "SELECT SUM(COALESCE(genelTutar,0)) AS devir FROM SahadanSatis WHERE status = 1 AND FirmaAdi = ? AND tarih < ?";
+    $devirParams = [$cari_firma, $tarihDevirBit];
+    if ($hareket === 'satis') {
+        $devirSql .= " AND islemTipi = 'GELİR TAHAKKUK'";
+        if ($cikis_firma > 0) {
+            $devirSql .= " AND cikisFirmaID = ?";
+            $devirParams[] = $cikis_firma;
+        }
+    } elseif ($hareket === 'tahsilat') {
+        $devirSql .= " AND islemTipi = 'GELİR TAHSİLAT'";
+    } elseif ($cikis_firma > 0) {
+        $devirSql .= " AND (cikisFirmaID = ? OR islemTipi = 'GELİR TAHSİLAT')";
+        $devirParams[] = $cikis_firma;
+    }
+    $devirStmt = $pdoReport->prepare($devirSql);
+    $devirStmt->execute($devirParams);
     $cariDevir = (float)$devirStmt->fetchColumn();
 
-    $stmt = $pdoReport->prepare("SELECT id, FirmaAdi, tarih, islemZamanDamgasi, islemTipi, dokumTipi, irsaliyeSeri, irsaliyeNo, genelTutar FROM SahadanSatis WHERE status = 1 AND FirmaAdi = ? AND tarih BETWEEN ? AND ? ORDER BY tarih ASC, islemZamanDamgasi ASC");
-    $stmt->execute([$cari_firma, $tarihBas, $tarihBit]);
+    $sql = "SELECT id, FirmaAdi, tarih, islemZamanDamgasi, islemTipi, dokumTipi, irsaliyeSeri, irsaliyeNo, genelTutar FROM SahadanSatis WHERE status = 1 AND FirmaAdi = ? AND tarih BETWEEN ? AND ?";
+    $params = [$cari_firma, $tarihBas, $tarihBit];
+    if ($hareket === 'satis') {
+        $sql .= " AND islemTipi = 'GELİR TAHAKKUK'";
+        if ($cikis_firma > 0) {
+            $sql .= " AND cikisFirmaID = ?";
+            $params[] = $cikis_firma;
+        }
+    } elseif ($hareket === 'tahsilat') {
+        $sql .= " AND islemTipi = 'GELİR TAHSİLAT'";
+    } elseif ($cikis_firma > 0) {
+        $sql .= " AND (cikisFirmaID = ? OR islemTipi = 'GELİR TAHSİLAT')";
+        $params[] = $cikis_firma;
+    }
+    $sql .= " ORDER BY tarih ASC, islemZamanDamgasi ASC";
+    $stmt = $pdoReport->prepare($sql);
+    $stmt->execute($params);
     $cariListe = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $bakiye = $cariDevir;
     foreach ($cariListe as &$row) {
@@ -99,7 +144,9 @@ $pdf->AddPage();
 $pdf->SetFont('dejavusans', 'B', 10);
 $pdf->Cell(0, 5, $cari_firma, 0, 1, 'L');
 $pdf->SetFont('dejavusans', '', 9);
-$pdf->Cell(0, 5, 'Dönem: ' . $baslangic . ' – ' . $bitis, 0, 1, 'L');
+$pdf->Cell(0, 5, 'Dönem: ' . $baslangic . ' – ' . $bitis
+    . ($cikisFirmaAdi !== '' ? ' | Çıkış: ' . $cikisFirmaAdi : '')
+    . ($hareket === 'satis' ? ' | Hareket: Satış' : ($hareket === 'tahsilat' ? ' | Hareket: Tahsilat' : '')), 0, 1, 'L');
 $pdf->Ln(2);
 
 $colW = [22, 14, 16, 58, 24, 24, 26];

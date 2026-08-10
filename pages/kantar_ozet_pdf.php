@@ -24,6 +24,12 @@ require_once $tcpdfPath;
 $baslangic      = isset($_GET['baslangic']) ? $_GET['baslangic'] : date('Y-m-01');
 $bitis          = isset($_GET['bitis'])     ? $_GET['bitis']     : date('Y-m-d');
 $ozet_bakiyesiz = isset($_GET['ozet_bakiyesiz']) ? (int)$_GET['ozet_bakiyesiz'] : 0;
+$musteri        = isset($_GET['musteri']) ? trim((string)$_GET['musteri']) : '';
+$cikis_firma    = isset($_GET['cikis_firma']) ? (int)$_GET['cikis_firma'] : 0;
+$hareket        = isset($_GET['hareket']) ? trim((string)$_GET['hareket']) : '';
+if (!in_array($hareket, ['', 'satis', 'tahsilat'], true)) {
+    $hareket = '';
+}
 
 if (!$pdoReport) {
     header('Content-Type: text/html; charset=utf-8');
@@ -33,17 +39,49 @@ if (!$pdoReport) {
 $tarihBas = str_replace('-', '', $baslangic) . '000000';
 $tarihBit = str_replace('-', '', $bitis) . '999999';
 
+$cikisFirmaAdi = '';
+if ($cikis_firma > 0) {
+    try {
+        $st = $pdoReport->prepare("SELECT COALESCE(NULLIF(TRIM(FirmaAdi),''), CONCAT('ID ', ?)) FROM Cari WHERE CariID = ? LIMIT 1");
+        $st->execute([$cikis_firma, $cikis_firma]);
+        $cikisFirmaAdi = (string)($st->fetchColumn() ?: ('ID ' . $cikis_firma));
+    } catch (PDOException $e) {
+        $cikisFirmaAdi = 'ID ' . $cikis_firma;
+    }
+}
+
 try {
+    $cikisCondSatis = ($cikis_firma > 0) ? ' AND cikisFirmaID = ' . (int)$cikis_firma : '';
     $sql = "SELECT FirmaAdi,
-            SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih >= ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS toplam_satis,
+            SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK'{$cikisCondSatis} AND tarih >= ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS toplam_satis,
             SUM(CASE WHEN islemTipi = 'GELİR TAHSİLAT' AND tarih >= ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS toplam_tahsilat,
-            SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS genel_satis,
+            SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK'{$cikisCondSatis} AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS genel_satis,
             SUM(CASE WHEN islemTipi = 'GELİR TAHSİLAT' AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS genel_tahsilat
             FROM SahadanSatis
-            WHERE status = 1 AND tarih <= ?
-            GROUP BY FirmaAdi ORDER BY FirmaAdi";
+            WHERE status = 1 AND tarih <= ?";
+    $params = [$tarihBas, $tarihBit, $tarihBas, $tarihBit, $tarihBit, $tarihBit, $tarihBit];
+    if ($hareket === 'satis') {
+        $sql .= " AND islemTipi = 'GELİR TAHAKKUK'";
+        if ($cikis_firma > 0) {
+            $sql .= " AND cikisFirmaID = ?";
+            $params[] = $cikis_firma;
+        }
+    } elseif ($hareket === 'tahsilat') {
+        $sql .= " AND islemTipi = 'GELİR TAHSİLAT'";
+    } elseif ($cikis_firma > 0) {
+        $sql .= " AND FirmaAdi IN (
+            SELECT DISTINCT FirmaAdi FROM SahadanSatis
+            WHERE status = 1 AND islemTipi = 'GELİR TAHAKKUK' AND cikisFirmaID = ?
+        )";
+        $params[] = $cikis_firma;
+    }
+    if ($musteri !== '') {
+        $sql .= " AND FirmaAdi = ?";
+        $params[] = $musteri;
+    }
+    $sql .= " GROUP BY FirmaAdi ORDER BY FirmaAdi";
     $stmt = $pdoReport->prepare($sql);
-    $stmt->execute([$tarihBas, $tarihBit, $tarihBas, $tarihBit, $tarihBit, $tarihBit, $tarihBit]);
+    $stmt->execute($params);
     $ozetListe = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($ozetListe as &$o) {
         $o['bakiye'] = (float)($o['genel_satis'] ?? 0) + (float)($o['genel_tahsilat'] ?? 0);
@@ -93,7 +131,10 @@ $pdf->SetAutoPageBreak(true, 10);
 $pdf->SetFont('dejavusans', '', 9);
 $pdf->AddPage();
 
-$pdf->Cell(0, 5, 'Dönem: ' . $baslangic . ' – ' . $bitis . ($ozet_bakiyesiz === 0 ? ' (bakiyesizler gizli)' : ' (tüm müşteriler)'), 0, 1, 'L');
+$pdf->Cell(0, 5, 'Dönem: ' . $baslangic . ' – ' . $bitis . ($ozet_bakiyesiz === 0 ? ' (bakiyesizler gizli)' : ' (tüm müşteriler)')
+    . ($cikisFirmaAdi !== '' ? ' | Çıkış: ' . $cikisFirmaAdi : '')
+    . ($musteri !== '' ? ' | Müşteri: ' . $musteri : '')
+    . ($hareket === 'satis' ? ' | Hareket: Satış' : ($hareket === 'tahsilat' ? ' | Hareket: Tahsilat' : '')), 0, 1, 'L');
 $pdf->Ln(2);
 
 $colW = [48, 24, 24, 26, 26, 26];

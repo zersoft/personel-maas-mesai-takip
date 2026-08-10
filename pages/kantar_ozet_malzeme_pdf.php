@@ -24,6 +24,12 @@ require_once $tcpdfPath;
 $baslangic       = isset($_GET['baslangic']) ? $_GET['baslangic'] : date('Y-m-01');
 $bitis           = isset($_GET['bitis'])     ? $_GET['bitis']     : date('Y-m-d');
 $malzeme_bos_gizle = isset($_GET['malzeme_bos_gizle']) ? (int)$_GET['malzeme_bos_gizle'] : 0;
+$musteri         = isset($_GET['musteri']) ? trim((string)$_GET['musteri']) : '';
+$cikis_firma     = isset($_GET['cikis_firma']) ? (int)$_GET['cikis_firma'] : 0;
+$hareket         = isset($_GET['hareket']) ? trim((string)$_GET['hareket']) : '';
+if (!in_array($hareket, ['', 'satis', 'tahsilat'], true)) {
+    $hareket = '';
+}
 
 if (!$pdoReport) {
     header('Content-Type: text/html; charset=utf-8');
@@ -33,15 +39,40 @@ if (!$pdoReport) {
 $tarihBas = str_replace('-', '', $baslangic) . '000000';
 $tarihBit = str_replace('-', '', $bitis) . '999999';
 
+$cikisFirmaAdi = '';
+if ($cikis_firma > 0) {
+    try {
+        $st = $pdoReport->prepare("SELECT COALESCE(NULLIF(TRIM(FirmaAdi),''), CONCAT('ID ', ?)) FROM Cari WHERE CariID = ? LIMIT 1");
+        $st->execute([$cikis_firma, $cikis_firma]);
+        $cikisFirmaAdi = (string)($st->fetchColumn() ?: ('ID ' . $cikis_firma));
+    } catch (PDOException $e) {
+        $cikisFirmaAdi = 'ID ' . $cikis_firma;
+    }
+}
+
 try {
     $sql = "SELECT COALESCE(NULLIF(TRIM(dokumTipi),''), '-') AS malzeme,
             SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih >= ? AND tarih <= ? THEN COALESCE(dokumNetKg,0) ELSE 0 END) AS donem_net_kg,
             SUM(CASE WHEN islemTipi = 'GELİR TAHAKKUK' AND tarih >= ? AND tarih <= ? THEN COALESCE(genelTutar,0) ELSE 0 END) AS donem_tutar
             FROM SahadanSatis
-            WHERE status = 1 AND tarih BETWEEN ? AND ?
-            GROUP BY COALESCE(NULLIF(TRIM(dokumTipi),''), '-') ORDER BY malzeme";
+            WHERE status = 1 AND tarih BETWEEN ? AND ?";
+    $params = [$tarihBas, $tarihBit, $tarihBas, $tarihBit, $tarihBas, $tarihBit];
+    if ($hareket === 'tahsilat') {
+        $sql .= " AND 1=0";
+    } else {
+        $sql .= " AND islemTipi = 'GELİR TAHAKKUK'";
+        if ($cikis_firma > 0) {
+            $sql .= " AND cikisFirmaID = ?";
+            $params[] = $cikis_firma;
+        }
+    }
+    if ($musteri !== '') {
+        $sql .= " AND FirmaAdi = ?";
+        $params[] = $musteri;
+    }
+    $sql .= " GROUP BY COALESCE(NULLIF(TRIM(dokumTipi),''), '-') ORDER BY malzeme";
     $stmt = $pdoReport->prepare($sql);
-    $stmt->execute([$tarihBas, $tarihBit, $tarihBas, $tarihBit, $tarihBas, $tarihBit]);
+    $stmt->execute($params);
     $ozetMalzemeListe = $stmt->fetchAll(PDO::FETCH_ASSOC);
     if ($malzeme_bos_gizle === 0) {
         $ozetMalzemeListe = array_values(array_filter($ozetMalzemeListe, function ($m) {
@@ -89,7 +120,10 @@ $pdf->SetAutoPageBreak(true, 10);
 $pdf->SetFont('dejavusans', '', 9);
 $pdf->AddPage();
 
-$pdf->Cell(0, 5, 'Dönem: ' . $baslangic . ' – ' . $bitis . ($malzeme_bos_gizle === 0 ? ' (dönemde satışı olmayanlar gizli)' : ' (tüm malzemeler)'), 0, 1, 'L');
+$pdf->Cell(0, 5, 'Dönem: ' . $baslangic . ' – ' . $bitis . ($malzeme_bos_gizle === 0 ? ' (dönemde satışı olmayanlar gizli)' : ' (tüm malzemeler)')
+    . ($cikisFirmaAdi !== '' ? ' | Çıkış: ' . $cikisFirmaAdi : '')
+    . ($musteri !== '' ? ' | Müşteri: ' . $musteri : '')
+    . ($hareket === 'satis' ? ' | Hareket: Satış' : ($hareket === 'tahsilat' ? ' | Hareket: Tahsilat' : '')), 0, 1, 'L');
 $pdf->Ln(2);
 
 $colW = [70, 32, 36, 24];
