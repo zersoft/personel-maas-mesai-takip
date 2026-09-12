@@ -108,3 +108,14 @@ span.money {
     cursor: not-allowed;
 }
 
+/* Genel Yazdırma (Print) Stilleri */
+@media print {
+    nav, .navbar, footer, .no-print, .d-print-none, .modal, .modal-backdrop {
+        display: none !important;
+    }
+    body {
+        background: #fff !important;
+        color: #000 !important;
+    }
+}
+

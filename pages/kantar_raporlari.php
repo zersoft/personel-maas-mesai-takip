@@ -610,17 +610,17 @@ if ($pdoReport) {
 include __DIR__ . '/../includes/header.php';
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
     <h4 class="mb-0"><i class="bi bi-truck"></i> Kantar Raporları</h4>
 </div>
 
 <?php if (!$pdoReport): ?>
-    <div class="alert alert-warning">
+    <div class="alert alert-warning no-print">
         <i class="bi bi-exclamation-triangle"></i> Raporlama veritabanı bağlantısı yok. Lütfen .env içinde <code>DB_REPORT_*</code> ayarlarını kontrol edin.
     </div>
 <?php else: ?>
 
-    <ul class="nav nav-tabs mb-3" role="tablist">
+    <ul class="nav nav-tabs mb-3 no-print" role="tablist">
         <li class="nav-item">
             <a class="nav-link <?php echo $rapor === 'perakende' ? 'active' : ''; ?>" href="?rapor=perakende&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&musteri=<?php echo urlencode($musteri); ?>&plaka=<?php echo urlencode($plaka); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&hareket=<?php echo urlencode($hareket); ?>"><i class="bi bi-cart-check"></i> Perakende Satış</a>
         </li>
@@ -671,12 +671,12 @@ include __DIR__ . '/../includes/header.php';
         'gecen_yil' => 'Geçen Yıl', 'bu_yil' => 'Bu Yıl',
     ];
     ?>
-    <div class="d-flex flex-wrap align-items-center gap-1 mb-3" style="font-size:.75rem">
+    <div class="d-flex flex-wrap align-items-center gap-1 mb-3 no-print" style="font-size:.75rem">
         <?php foreach ($periyotlar as $p => $label): ?>
         <a href="?rapor=<?php echo $rapor; ?>&periyot=<?php echo $p; ?><?php echo $periyotSuffix; ?>" class="btn <?php echo $periyot === $p ? 'btn-dark' : 'btn-outline-secondary'; ?>" style="padding:.2rem .5rem;font-size:.75rem;line-height:1.3"><?php echo $label; ?></a>
         <?php endforeach; ?>
         <span class="text-muted mx-1">|</span>
-        <form method="get" class="d-flex align-items-center gap-1 flex-wrap">
+        <form method="get" class="d-flex align-items-center gap-1 flex-wrap no-print">
             <input type="hidden" name="rapor" value="<?php echo htmlspecialchars($rapor); ?>">
             <?php if ($rapor === 'ozet'): ?>
             <input type="hidden" name="ozet_bakiyesiz" value="<?php echo (int)$ozet_bakiyesiz; ?>">
@@ -1382,7 +1382,39 @@ include __DIR__ . '/../includes/header.php';
 
         <div class="card shadow-sm mb-4">
             <div class="card-body">
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <!-- Yazdırma için özel temiz rapor başlığı (yalnızca print modunda görünür) -->
+                <div class="d-none d-print-block mb-3 border-bottom pb-2">
+                    <div class="d-flex justify-content-between align-items-end">
+                        <div>
+                            <h4 class="fw-bold mb-1" style="color:#0f172a;"><?php echo htmlspecialchars($baslik); ?></h4>
+                            <div style="font-size: 11px; color: #475569;">
+                                <strong>Tarih:</strong> <?php echo date('d.m.Y', strtotime($baslangic)); ?> – <?php echo date('d.m.Y', strtotime($bitis)); ?>
+                                <?php if ($cikis_firma && isset($cikisFirmaListesi[$cikis_firma])): ?>
+                                    &nbsp;|&nbsp; <strong>Çıkış:</strong> <?php echo htmlspecialchars($cikisFirmaListesi[$cikis_firma]); ?>
+                                <?php endif; ?>
+                                <?php if ($musteri): ?>
+                                    &nbsp;|&nbsp; <strong>Müşteri:</strong> <?php echo htmlspecialchars($musteri); ?>
+                                <?php endif; ?>
+                                <?php if ($gidecegi_yer): ?>
+                                    &nbsp;|&nbsp; <strong>Gideceği Yer:</strong> <?php echo htmlspecialchars($gidecegi_yer); ?>
+                                <?php endif; ?>
+                                <?php if ($malzeme): ?>
+                                    &nbsp;|&nbsp; <strong>Malzeme:</strong> <?php echo htmlspecialchars($malzeme); ?>
+                                <?php endif; ?>
+                                <?php if ($plaka): ?>
+                                    &nbsp;|&nbsp; <strong>Plaka:</strong> <?php echo htmlspecialchars($plaka); ?>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="text-end" style="font-size: 11px; color: #475569;">
+                            <div><strong>Toplam:</strong> <?php echo number_format($esnekGenelToplam['sefer'], 0, ',', '.'); ?> Sefer &nbsp;|&nbsp; <?php echo number_format($esnekGenelToplam['net_kg'], 0, ',', '.'); ?> kg</div>
+                            <div class="text-muted" style="font-size: 10px;">Yazdırma Tarihi: <?php echo date('d.m.Y H:i'); ?></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Web ekran başlığı ve butonları (print modunda gizlenir) -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 d-print-none">
                     <div>
                         <h5 class="card-title mb-1 text-primary fw-bold">
                             <i class="bi bi-file-earmark-bar-graph"></i> <?php echo htmlspecialchars($baslik); ?>
@@ -1692,6 +1724,83 @@ include __DIR__ . '/../includes/header.php';
 <style>
 .select2-container--bootstrap-5 .select2-selection { min-height: 31px; }
 .select2-container { min-width: 200px; }
+
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 6mm 8mm;
+    }
+    nav, .navbar, footer, .no-print, .d-print-none, form, .btn, .modal, .modal-backdrop, .alert, .select2-container {
+        display: none !important;
+    }
+    html, body {
+        background: #fff !important;
+        color: #000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 10px !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .container-fluid, .container {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+    }
+    .card-body {
+        padding: 0 !important;
+    }
+    .table-responsive {
+        overflow: visible !important;
+        display: block !important;
+    }
+    table.table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 9px !important;
+        margin-bottom: 0 !important;
+    }
+    table.table th, table.table td {
+        border: 1px solid #94a3b8 !important;
+        padding: 2.5px 4px !important;
+        line-height: 1.2 !important;
+    }
+    thead {
+        display: table-header-group !important;
+    }
+    tr {
+        page-break-inside: avoid !important;
+    }
+    tr.table-primary, tr[style*="background-color: #e0f2fe"], td[style*="background-color: #e0f2fe"] {
+        background-color: #e0f2fe !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    tr.table-light, tr[style*="background-color: #f1f5f9"], td[style*="background-color: #f1f5f9"] {
+        background-color: #f1f5f9 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    tr.table-warning, tr[style*="background-color: #fef9c3"], td[style*="background-color: #fef9c3"] {
+        background-color: #fef9c3 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    tr.table-dark, tr[style*="background-color: #1e293b"], td[style*="background-color: #1e293b"] {
+        background-color: #1e293b !important;
+        color: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
 </style>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
