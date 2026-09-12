@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/functions.php';
 $pageTitle = 'Kantar Raporları';
 
 $rapor = isset($_GET['rapor']) ? $_GET['rapor'] : 'perakende';
-if (!in_array($rapor, ['perakende', 'ozet', 'ozet_malzeme', 'cari', 'kantar_takip', 'mizan'], true)) {
+if (!in_array($rapor, ['perakende', 'ozet', 'ozet_malzeme', 'cari', 'kantar_takip', 'mizan', 'esnek'], true)) {
     $rapor = 'perakende';
 }
 
@@ -52,6 +52,54 @@ $cari_firma = isset($_GET['cari_firma']) ? trim($_GET['cari_firma']) : '';
 $ozet_bakiyesiz = isset($_GET['ozet_bakiyesiz']) ? (int)$_GET['ozet_bakiyesiz'] : 0; // 0 = bakiyesizleri gizle (varsayılan), 1 = göster
 $malzeme_bos_gizle = isset($_GET['malzeme_bos_gizle']) ? (int)$_GET['malzeme_bos_gizle'] : 0; // 0 = dönemde satışı olmayan malzemeyi gizle, 1 = tümünü göster
 
+// Esnek Rapor Parametreleri
+$baslik = isset($_GET['baslik']) && trim((string)$_GET['baslik']) !== '' ? trim((string)$_GET['baslik']) : 'Gideceği Yer & Malzeme Bazlı Sevkiyat Raporu';
+$grup1  = isset($_GET['grup1']) ? trim((string)$_GET['grup1']) : 'gidecegiYer';
+$grup2  = isset($_GET['grup2']) ? trim((string)$_GET['grup2']) : 'dokumTipi';
+$gidecegi_yer = isset($_GET['gidecegi_yer']) ? trim((string)$_GET['gidecegi_yer']) : '';
+$malzeme = isset($_GET['malzeme']) ? trim((string)$_GET['malzeme']) : '';
+
+$gecerliGruplar = [
+    'gidecegiYer' => 'Gideceği Yer',
+    'dokumTipi'   => 'Malzeme',
+    'FirmaAdi'    => 'Müşteri',
+    'plaka'       => 'Plaka',
+    'tarih'       => 'Tarih',
+    'cikisFirma'  => 'Çıkış Firması',
+    'yok'         => 'Yok (Gruplama Yapma)'
+];
+if (!array_key_exists($grup1, $gecerliGruplar)) $grup1 = 'gidecegiYer';
+if (!array_key_exists($grup2, $gecerliGruplar)) $grup2 = 'dokumTipi';
+
+$tumKolonlar = [
+    'kantar_fis'    => ['baslik' => 'KantarFiş', 'hizalama' => 'start'],
+    'irsaliye_no'   => ['baslik' => 'irsaliyeNo', 'hizalama' => 'start'],
+    'tarih'         => ['baslik' => 'tarih', 'hizalama' => 'start'],
+    'saat'          => ['baslik' => 'saat', 'hizalama' => 'start'],
+    'plaka'         => ['baslik' => 'plaka', 'hizalama' => 'start'],
+    'dokum_net_kg'  => ['baslik' => 'dokumNetKilo', 'hizalama' => 'end'],
+    'malzeme'       => ['baslik' => 'Malzeme', 'hizalama' => 'start'],
+    'gidecegi_yer'  => ['baslik' => 'gidecegiYer', 'hizalama' => 'start'],
+    'musteri'       => ['baslik' => 'Müşteri', 'hizalama' => 'start'],
+    'brim_fiyat'    => ['baslik' => 'Birim Fiyat', 'hizalama' => 'end'],
+    'tutar'         => ['baslik' => 'Tutar', 'hizalama' => 'end'],
+    'kdv'           => ['baslik' => 'KDV', 'hizalama' => 'end'],
+    'genel_tutar'   => ['baslik' => 'Genel Tutar', 'hizalama' => 'end'],
+    'hareket'       => ['baslik' => 'Hareket', 'hizalama' => 'center'],
+    'cikis_firmasi' => ['baslik' => 'Çıkış Firması', 'hizalama' => 'start']
+];
+
+$varsayilanKolonlar = ['kantar_fis', 'irsaliye_no', 'tarih', 'saat', 'plaka', 'dokum_net_kg', 'malzeme', 'gidecegi_yer'];
+
+if (isset($_GET['kolonlar']) && is_array($_GET['kolonlar'])) {
+    $seciliKolonlar = array_values(array_intersect($_GET['kolonlar'], array_keys($tumKolonlar)));
+    if (empty($seciliKolonlar)) {
+        $seciliKolonlar = $varsayilanKolonlar;
+    }
+} else {
+    $seciliKolonlar = $varsayilanKolonlar;
+}
+
 $tarihBas = str_replace('-', '', $baslangic) . '000000';
 $tarihBit = str_replace('-', '', $bitis) . '999999';
 // Cari devir: seçilen başlangıçtan önceki tüm hareketlerin bakiyesi
@@ -84,6 +132,10 @@ $musteriListesi = [];
 $cikisFirmaListesi = []; // [cikisFirmaID => FirmaAdi]
 $kantarTakipOzet = []; // müşteri bazlı özet (kantar_takip raporu)
 $mizanListe = []; // mizan: devir, dönem satış/tahsilat, bakiye
+$gidecegiYerListesi = [];
+$malzemeListesi = [];
+$esnekGruplanmis = [];
+$esnekGenelToplam = ['sefer' => 0, 'net_kg' => 0, 'tutar' => 0];
 $cikisFirmaAdi = '';
 $raporDbHata = null;
 
@@ -125,6 +177,14 @@ if ($pdoReport) {
             }
         }
         asort($cikisFirmaListesi, SORT_STRING | SORT_FLAG_CASE);
+
+        // Gideceği yer listesi (esnek rapor filtresi)
+        $gyStmt = $pdoReport->query("SELECT DISTINCT gidecegiYer FROM SahadanSatis WHERE status = 1 AND gidecegiYer IS NOT NULL AND gidecegiYer != '' ORDER BY gidecegiYer");
+        $gidecegiYerListesi = $gyStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        // Malzeme listesi (esnek rapor filtresi)
+        $malzStmt = $pdoReport->query("SELECT DISTINCT dokumTipi FROM SahadanSatis WHERE status = 1 AND dokumTipi IS NOT NULL AND dokumTipi != '' ORDER BY dokumTipi");
+        $malzemeListesi = $malzStmt->fetchAll(PDO::FETCH_COLUMN);
 
         // Kantar Takip / Mizan: varsayılan çıkış firması = "KANTAR TAKİP"
         if (($rapor === 'kantar_takip' || $rapor === 'mizan') && $cikis_firma <= 0) {
@@ -424,6 +484,123 @@ if ($pdoReport) {
                 $row['kumulatif_bakiye'] = $bakiye;
             }
             unset($row);
+        } elseif ($rapor === 'esnek') {
+            // Esnek Rapor: çok seviyeli gruplama ve alt toplamlar
+            $sql = "SELECT s.id, s.Kimlik, s.fisNo, s.okunanFisNo, s.irsaliyeNo, s.irsaliyeSeri, s.tarih,
+                           s.islemZamanDamgasi, s.saat, s.plaka, s.dokumNetKg, s.dokumTipi, s.gidecegiYer,
+                           s.FirmaAdi, s.brimFiyat, s.dokumTutar, s.kdv, s.genelTutar, s.islemTipi, s.cikisFirmaID,
+                           COALESCE(c.FirmaAdi, CONCAT('ID ', s.cikisFirmaID)) AS cikisFirmaAdi
+                    FROM SahadanSatis s
+                    LEFT JOIN Cari c ON c.CariID = s.cikisFirmaID
+                    WHERE s.status = 1 AND s.tarih BETWEEN ? AND ?";
+            $params = [$tarihBas, $tarihBit];
+
+            if ($musteri !== '') {
+                $sql .= " AND s.FirmaAdi = ?";
+                $params[] = $musteri;
+            }
+            if ($plaka !== '') {
+                $sql .= " AND s.plaka LIKE ?";
+                $params[] = '%' . $plaka . '%';
+            }
+            if ($gidecegi_yer !== '') {
+                $sql .= " AND s.gidecegiYer = ?";
+                $params[] = $gidecegi_yer;
+            }
+            if ($malzeme !== '') {
+                $sql .= " AND s.dokumTipi = ?";
+                $params[] = $malzeme;
+            }
+            if ($hareket === 'satis') {
+                $sql .= " AND s.islemTipi = 'GELİR TAHAKKUK'";
+                if ($cikis_firma > 0) {
+                    $sql .= " AND s.cikisFirmaID = ?";
+                    $params[] = $cikis_firma;
+                }
+            } elseif ($hareket === 'tahsilat') {
+                $sql .= " AND s.islemTipi = 'GELİR TAHSİLAT'";
+            } elseif ($cikis_firma > 0) {
+                $sql .= " AND (s.cikisFirmaID = ? OR s.islemTipi = 'GELİR TAHSİLAT')";
+                $params[] = $cikis_firma;
+            }
+
+            $sql .= " ORDER BY s.tarih DESC, s.islemZamanDamgasi DESC";
+            $stmt = $pdoReport->prepare($sql);
+            $stmt->execute($params);
+            $liste = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $getGrupDeger = function($r, $gType) {
+                if ($gType === 'gidecegiYer') {
+                    $v = trim((string)($r['gidecegiYer'] ?? ''));
+                    return $v !== '' ? $v : 'Belirtilmemiş';
+                } elseif ($gType === 'dokumTipi') {
+                    $v = trim((string)($r['dokumTipi'] ?? ''));
+                    return $v !== '' ? $v : 'Belirtilmemiş';
+                } elseif ($gType === 'FirmaAdi') {
+                    $v = trim((string)($r['FirmaAdi'] ?? ''));
+                    return $v !== '' ? $v : 'Belirtilmemiş';
+                } elseif ($gType === 'plaka') {
+                    $v = trim((string)($r['plaka'] ?? ''));
+                    return $v !== '' ? $v : 'Plakasız';
+                } elseif ($gType === 'tarih') {
+                    return formatSahaTarih($r['tarih'] ?? null);
+                } elseif ($gType === 'cikisFirma') {
+                    $v = trim((string)($r['cikisFirmaAdi'] ?? ''));
+                    return $v !== '' ? $v : 'Belirtilmemiş';
+                }
+                return '';
+            };
+
+            $hasGrup1 = ($grup1 !== 'yok');
+            $hasGrup2 = ($grup2 !== 'yok' && $grup2 !== $grup1);
+
+            foreach ($liste as $r) {
+                $kg = (float)($r['dokumNetKg'] ?? 0);
+                $tut = (float)($r['dokumTutar'] ?? 0);
+                $esnekGenelToplam['sefer']++;
+                $esnekGenelToplam['net_kg'] += $kg;
+                $esnekGenelToplam['tutar'] += $tut;
+
+                if ($hasGrup1 && $hasGrup2) {
+                    $k1 = $getGrupDeger($r, $grup1);
+                    $k2 = $getGrupDeger($r, $grup2);
+
+                    if (!isset($esnekGruplanmis[$k1])) {
+                        $esnekGruplanmis[$k1] = [
+                            'toplam' => ['sefer' => 0, 'net_kg' => 0, 'tutar' => 0],
+                            'alt_gruplar' => []
+                        ];
+                    }
+                    $esnekGruplanmis[$k1]['toplam']['sefer']++;
+                    $esnekGruplanmis[$k1]['toplam']['net_kg'] += $kg;
+                    $esnekGruplanmis[$k1]['toplam']['tutar'] += $tut;
+
+                    if (!isset($esnekGruplanmis[$k1]['alt_gruplar'][$k2])) {
+                        $esnekGruplanmis[$k1]['alt_gruplar'][$k2] = [
+                            'toplam' => ['sefer' => 0, 'net_kg' => 0, 'tutar' => 0],
+                            'satirlar' => []
+                        ];
+                    }
+                    $esnekGruplanmis[$k1]['alt_gruplar'][$k2]['toplam']['sefer']++;
+                    $esnekGruplanmis[$k1]['alt_gruplar'][$k2]['toplam']['net_kg'] += $kg;
+                    $esnekGruplanmis[$k1]['alt_gruplar'][$k2]['toplam']['tutar'] += $tut;
+                    $esnekGruplanmis[$k1]['alt_gruplar'][$k2]['satirlar'][] = $r;
+                } elseif ($hasGrup1) {
+                    $k1 = $getGrupDeger($r, $grup1);
+                    if (!isset($esnekGruplanmis[$k1])) {
+                        $esnekGruplanmis[$k1] = [
+                            'toplam' => ['sefer' => 0, 'net_kg' => 0, 'tutar' => 0],
+                            'satirlar' => []
+                        ];
+                    }
+                    $esnekGruplanmis[$k1]['toplam']['sefer']++;
+                    $esnekGruplanmis[$k1]['toplam']['net_kg'] += $kg;
+                    $esnekGruplanmis[$k1]['toplam']['tutar'] += $tut;
+                    $esnekGruplanmis[$k1]['satirlar'][] = $r;
+                } else {
+                    $esnekGruplanmis['duz_liste'][] = $r;
+                }
+            }
         }
     } catch (PDOException $e) {
         $raporDbHata = $e->getMessage();
@@ -462,12 +639,15 @@ include __DIR__ . '/../includes/header.php';
         <li class="nav-item">
             <a class="nav-link <?php echo $rapor === 'cari' ? 'active' : ''; ?>" href="?rapor=cari&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&cari_firma=<?php echo urlencode($cari_firma); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&hareket=<?php echo urlencode($hareket); ?>"><i class="bi bi-journal-bookmark"></i> Cari Ekstre</a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $rapor === 'esnek' ? 'active' : ''; ?>" href="?rapor=esnek&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&musteri=<?php echo urlencode($musteri); ?>&plaka=<?php echo urlencode($plaka); ?>&hareket=<?php echo urlencode($hareket); ?>&gidecegi_yer=<?php echo urlencode($gidecegi_yer); ?>&malzeme=<?php echo urlencode($malzeme); ?>&grup1=<?php echo urlencode($grup1); ?>&grup2=<?php echo urlencode($grup2); ?>&baslik=<?php echo urlencode($baslik); ?>"><i class="bi bi-diagram-3"></i> Esnek Rapor</a>
+        </li>
     </ul>
 
     <!-- Tarih / periyot seçimi (ortak) -->
     <?php
     $periyotSuffix = ($rapor === 'cari' && $cari_firma !== '') ? '&cari_firma=' . urlencode($cari_firma) : '';
-    if (in_array($rapor, ['perakende', 'kantar_takip', 'mizan', 'ozet', 'ozet_malzeme', 'cari'], true)) {
+    if (in_array($rapor, ['perakende', 'kantar_takip', 'mizan', 'ozet', 'ozet_malzeme', 'cari', 'esnek'], true)) {
         if ($cikis_firma > 0) $periyotSuffix .= '&cikis_firma=' . (int)$cikis_firma;
         if ($musteri !== '' && $rapor !== 'cari') $periyotSuffix .= '&musteri=' . urlencode($musteri);
         if ($hareket !== '' && $rapor !== 'mizan') $periyotSuffix .= '&hareket=' . urlencode($hareket);
@@ -475,6 +655,15 @@ include __DIR__ . '/../includes/header.php';
     if ($rapor === 'perakende' && $plaka !== '') $periyotSuffix .= '&plaka=' . urlencode($plaka);
     if ($rapor === 'ozet') $periyotSuffix .= '&ozet_bakiyesiz=' . (int)$ozet_bakiyesiz;
     if ($rapor === 'ozet_malzeme') $periyotSuffix .= '&malzeme_bos_gizle=' . (int)$malzeme_bos_gizle;
+    if ($rapor === 'esnek') {
+        if ($gidecegi_yer !== '') $periyotSuffix .= '&gidecegi_yer=' . urlencode($gidecegi_yer);
+        if ($malzeme !== '') $periyotSuffix .= '&malzeme=' . urlencode($malzeme);
+        if ($plaka !== '') $periyotSuffix .= '&plaka=' . urlencode($plaka);
+        $periyotSuffix .= '&grup1=' . urlencode($grup1) . '&grup2=' . urlencode($grup2) . '&baslik=' . urlencode($baslik);
+        foreach ($seciliKolonlar as $ck) {
+            $periyotSuffix .= '&kolonlar[]=' . urlencode($ck);
+        }
+    }
     $periyotlar = [
         'dun' => 'Dün', 'bugun' => 'Bugün',
         'gecen_hafta' => 'Geçen Hafta', 'bu_hafta' => 'Bu Hafta',
@@ -494,6 +683,14 @@ include __DIR__ . '/../includes/header.php';
             <?php endif; ?>
             <?php if ($rapor === 'ozet_malzeme'): ?>
             <input type="hidden" name="malzeme_bos_gizle" value="<?php echo (int)$malzeme_bos_gizle; ?>">
+            <?php endif; ?>
+            <?php if ($rapor === 'esnek'): ?>
+            <input type="hidden" name="baslik" value="<?php echo htmlspecialchars($baslik); ?>">
+            <input type="hidden" name="grup1" value="<?php echo htmlspecialchars($grup1); ?>">
+            <input type="hidden" name="grup2" value="<?php echo htmlspecialchars($grup2); ?>">
+            <?php foreach ($seciliKolonlar as $ck): ?>
+            <input type="hidden" name="kolonlar[]" value="<?php echo htmlspecialchars($ck); ?>">
+            <?php endforeach; ?>
             <?php endif; ?>
             <input type="date" name="baslangic" class="form-control form-control-sm" style="width:auto" value="<?php echo htmlspecialchars($baslangic); ?>">
             <span class="text-muted">–</span>
@@ -519,7 +716,21 @@ include __DIR__ . '/../includes/header.php';
                 <?php endforeach; ?>
             </select>
             <?php endif; ?>
-            <?php if ($rapor === 'perakende'): ?>
+            <?php if ($rapor === 'esnek'): ?>
+            <select name="gidecegi_yer" id="gidecegiYerSelect" class="form-select form-select-sm" style="width:180px" title="Gideceği Yer">
+                <option value="">-- Tüm Gideceği Yerler --</option>
+                <?php foreach ($gidecegiYerListesi as $gy): ?>
+                    <option value="<?php echo htmlspecialchars($gy); ?>" <?php echo $gidecegi_yer === $gy ? 'selected' : ''; ?>><?php echo htmlspecialchars($gy); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select name="malzeme" id="malzemeSelect" class="form-select form-select-sm" style="width:180px" title="Malzeme">
+                <option value="">-- Tüm Malzemeler --</option>
+                <?php foreach ($malzemeListesi as $mlz): ?>
+                    <option value="<?php echo htmlspecialchars($mlz); ?>" <?php echo $malzeme === $mlz ? 'selected' : ''; ?>><?php echo htmlspecialchars($mlz); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <?php endif; ?>
+            <?php if ($rapor === 'perakende' || $rapor === 'esnek'): ?>
             <input type="text" name="plaka" class="form-control form-control-sm" style="width:120px" value="<?php echo htmlspecialchars($plaka); ?>" placeholder="Plaka">
             <?php endif; ?>
             <?php if ($rapor !== 'mizan'): ?>
@@ -529,7 +740,7 @@ include __DIR__ . '/../includes/header.php';
                 <option value="tahsilat" <?php echo $hareket === 'tahsilat' ? 'selected' : ''; ?>>Tahsilat</option>
             </select>
             <?php endif; ?>
-            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i></button>
+            <button type="submit" class="btn btn-primary btn-sm" title="Filtrele"><i class="bi bi-funnel"></i></button>
             <?php if ($rapor === 'perakende'): ?>
             <a href="kantar_perakende_pdf.php?baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&musteri=<?php echo urlencode($musteri); ?>&plaka=<?php echo urlencode($plaka); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&hareket=<?php echo urlencode($hareket); ?>" target="_blank" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-earmark-pdf"></i></a>
             <?php elseif ($rapor === 'kantar_takip'): ?>
@@ -542,6 +753,27 @@ include __DIR__ . '/../includes/header.php';
             <a href="kantar_ozet_malzeme_pdf.php?baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&malzeme_bos_gizle=<?php echo (int)$malzeme_bos_gizle; ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&musteri=<?php echo urlencode($musteri); ?>&hareket=<?php echo urlencode($hareket); ?>" target="_blank" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-earmark-pdf"></i></a>
             <?php elseif ($rapor === 'cari'): ?>
             <a href="kantar_cari_ekstre_pdf.php?cari_firma=<?php echo urlencode($cari_firma); ?>&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&hareket=<?php echo urlencode($hareket); ?>" target="_blank" class="btn btn-sm btn-outline-danger <?php echo $cari_firma === '' ? 'disabled' : ''; ?>"><i class="bi bi-file-earmark-pdf"></i></a>
+            <?php elseif ($rapor === 'esnek'): ?>
+            <?php
+            $esnekPdfParams = [
+                'baslangic' => $baslangic,
+                'bitis' => $bitis,
+                'cikis_firma' => $cikis_firma,
+                'musteri' => $musteri,
+                'plaka' => $plaka,
+                'hareket' => $hareket,
+                'gidecegi_yer' => $gidecegi_yer,
+                'malzeme' => $malzeme,
+                'grup1' => $grup1,
+                'grup2' => $grup2,
+                'baslik' => $baslik,
+                'kolonlar' => $seciliKolonlar
+            ];
+            $esnekPdfUrl = 'kantar_esnek_pdf.php?' . http_build_query($esnekPdfParams);
+            ?>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#esnekAyarModal" title="Grupları ve Kolonları Özelleştir"><i class="bi bi-sliders"></i> Özelleştir</button>
+            <a href="<?php echo htmlspecialchars($esnekPdfUrl); ?>" target="_blank" class="btn btn-sm btn-outline-danger" title="PDF Olarak İndir"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()" title="Yazdır"><i class="bi bi-printer"></i></button>
             <?php endif; ?>
         </form>
     </div>
@@ -1063,6 +1295,388 @@ include __DIR__ . '/../includes/header.php';
         </div>
     <?php endif; ?>
 
+    <!-- Esnek Rapor -->
+    <?php if ($rapor === 'esnek' && !$raporDbHata): ?>
+        <?php
+        $renderCell = function($colKey, $r) {
+            switch ($colKey) {
+                case 'kantar_fis':
+                    $fis = !empty($r['okunanFisNo']) ? $r['okunanFisNo'] : (!empty($r['fisNo']) ? $r['fisNo'] : (!empty($r['Kimlik']) ? $r['Kimlik'] : $r['id']));
+                    return htmlspecialchars((string)$fis);
+                case 'irsaliye_no':
+                    return htmlspecialchars(($r['irsaliyeSeri'] ?? '') . ($r['irsaliyeNo'] ?? ''));
+                case 'tarih':
+                    return formatSahaTarih($r['tarih'] ?? null);
+                case 'saat':
+                    return formatSahaZaman($r['islemZamanDamgasi'] ?? null);
+                case 'plaka':
+                    return htmlspecialchars($r['plaka'] ?? '-');
+                case 'dokum_net_kg':
+                    return number_format((float)($r['dokumNetKg'] ?? 0), 0, ',', '.');
+                case 'malzeme':
+                    return htmlspecialchars($r['dokumTipi'] ?? '-');
+                case 'gidecegi_yer':
+                    return htmlspecialchars($r['gidecegiYer'] ?? '-');
+                case 'musteri':
+                    return htmlspecialchars($r['FirmaAdi'] ?? '-');
+                case 'brim_fiyat':
+                    return number_format((float)($r['brimFiyat'] ?? 0), 2, ',', '.');
+                case 'tutar':
+                    return number_format((float)($r['dokumTutar'] ?? 0), 2, ',', '.');
+                case 'kdv':
+                    return number_format((float)($r['kdv'] ?? 0), 2, ',', '.');
+                case 'genel_tutar':
+                    return number_format((float)($r['genelTutar'] ?? 0), 2, ',', '.');
+                case 'hareket':
+                    $isTahsilat = (isset($r['islemTipi']) && $r['islemTipi'] === 'GELİR TAHSİLAT');
+                    return '<span class="badge ' . ($isTahsilat ? 'bg-success' : 'bg-primary') . '">' . ($isTahsilat ? 'Tahsilat' : 'Satış') . '</span>';
+                case 'cikis_firmasi':
+                    return htmlspecialchars($r['cikisFirmaAdi'] ?? '-');
+                default:
+                    return '';
+            }
+        };
+
+        $renderSubtotalCells = function($title, $sefer, $kg, $tutar, $seciliKolonlar, $tumKolonlar) {
+            $html = '';
+            $summaryColKeys = ['dokum_net_kg', 'tutar', 'genel_tutar', 'brim_fiyat', 'kdv'];
+            $firstSummaryIdx = false;
+            foreach ($seciliKolonlar as $idx => $ck) {
+                if (in_array($ck, $summaryColKeys, true)) {
+                    $firstSummaryIdx = $idx;
+                    break;
+                }
+            }
+
+            if ($firstSummaryIdx === false || $firstSummaryIdx === 0) {
+                $firstTextFound = false;
+                foreach ($seciliKolonlar as $col) {
+                    $align = $tumKolonlar[$col]['hizalama'];
+                    if (!$firstTextFound && in_array($align, ['start', 'center'])) {
+                        $html .= '<td class="text-start">' . $title . ' <span class="badge bg-secondary ms-1">' . number_format($sefer, 0, ',', '.') . ' Sefer</span></td>';
+                        $firstTextFound = true;
+                    } elseif ($col === 'dokum_net_kg') {
+                        $html .= '<td class="text-end fw-bold text-nowrap">' . number_format($kg, 0, ',', '.') . ' kg</td>';
+                    } elseif ($col === 'tutar' || $col === 'genel_tutar') {
+                        $html .= '<td class="text-end fw-bold text-nowrap">' . number_format($tutar, 2, ',', '.') . ' ₺</td>';
+                    } else {
+                        $html .= '<td></td>';
+                    }
+                }
+            } else {
+                $html .= '<td colspan="' . (int)$firstSummaryIdx . '" class="text-start">' . $title . ' <span class="badge bg-secondary ms-1">' . number_format($sefer, 0, ',', '.') . ' Sefer</span></td>';
+                for ($i = $firstSummaryIdx; $i < count($seciliKolonlar); $i++) {
+                    $col = $seciliKolonlar[$i];
+                    if ($col === 'dokum_net_kg') {
+                        $html .= '<td class="text-end fw-bold text-nowrap">' . number_format($kg, 0, ',', '.') . ' kg</td>';
+                    } elseif ($col === 'tutar' || $col === 'genel_tutar') {
+                        $html .= '<td class="text-end fw-bold text-nowrap">' . number_format($tutar, 2, ',', '.') . ' ₺</td>';
+                    } else {
+                        $html .= '<td></td>';
+                    }
+                }
+            }
+            return $html;
+        };
+        ?>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                    <div>
+                        <h5 class="card-title mb-1 text-primary fw-bold">
+                            <i class="bi bi-file-earmark-bar-graph"></i> <?php echo htmlspecialchars($baslik); ?>
+                        </h5>
+                        <div class="text-muted small d-flex flex-wrap align-items-center gap-1">
+                            <span class="badge bg-light text-dark border"><i class="bi bi-layers"></i> 1. Grup: <?php echo htmlspecialchars($gecerliGruplar[$grup1]); ?></span>
+                            <span class="badge bg-light text-dark border"><i class="bi bi-diagram-2"></i> 2. Grup: <?php echo htmlspecialchars($gecerliGruplar[$grup2]); ?></span>
+                            <span class="badge bg-primary"><?php echo number_format($esnekGenelToplam['sefer'], 0, ',', '.'); ?> Sefer</span>
+                            <span class="badge bg-success"><?php echo number_format($esnekGenelToplam['net_kg'], 0, ',', '.'); ?> kg</span>
+                            <?php if ($esnekGenelToplam['tutar'] > 0): ?>
+                            <span class="badge bg-info text-dark"><?php echo number_format($esnekGenelToplam['tutar'], 2, ',', '.'); ?> ₺</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#esnekAyarModal">
+                            <i class="bi bi-sliders"></i> Grupları & Kolonları Özelleştir
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm table-bordered align-middle mb-0" style="font-size:.85rem">
+                        <thead class="table-light">
+                            <tr>
+                                <?php foreach ($seciliKolonlar as $colKey): ?>
+                                    <th class="text-<?php echo $tumKolonlar[$colKey]['hizalama']; ?> text-nowrap">
+                                        <?php echo htmlspecialchars($tumKolonlar[$colKey]['baslik']); ?>
+                                    </th>
+                                <?php endforeach; ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $hasGrup1 = ($grup1 !== 'yok');
+                            $hasGrup2 = ($grup2 !== 'yok' && $grup2 !== $grup1);
+
+                            if (empty($esnekGruplanmis) || ($hasGrup1 && empty($esnekGruplanmis)) || (!$hasGrup1 && empty($esnekGruplanmis['duz_liste']))):
+                            ?>
+                                <tr>
+                                    <td colspan="<?php echo count($seciliKolonlar); ?>" class="text-center text-muted py-4">
+                                        <i class="bi bi-inbox fs-3 d-block mb-1"></i> Bu kriterlere uygun kayıt bulunamadı.
+                                    </td>
+                                </tr>
+                            <?php
+                            elseif ($hasGrup1 && $hasGrup2):
+                                foreach ($esnekGruplanmis as $k1 => $g1Data):
+                                    $g1Sefer = $g1Data['toplam']['sefer'];
+                                    $g1Kg    = $g1Data['toplam']['net_kg'];
+                                    $g1Tut   = $g1Data['toplam']['tutar'];
+                            ?>
+                                    <!-- 1. Seviye Grup Başlığı -->
+                                    <tr class="table-primary border-top border-dark border-2">
+                                        <td colspan="<?php echo count($seciliKolonlar); ?>" class="fw-bold py-2">
+                                            <i class="bi bi-geo-alt-fill text-danger me-1"></i>
+                                            <?php echo htmlspecialchars($gecerliGruplar[$grup1]); ?>:
+                                            <span class="text-dark fs-6 ms-1"><?php echo htmlspecialchars($k1); ?></span>
+                                            <span class="badge bg-dark ms-2"><?php echo number_format($g1Sefer, 0, ',', '.'); ?> Sefer</span>
+                                            <span class="badge bg-secondary ms-1"><?php echo number_format($g1Kg, 0, ',', '.'); ?> kg</span>
+                                            <?php if ($g1Tut > 0): ?>
+                                            <span class="badge bg-info text-dark ms-1"><?php echo number_format($g1Tut, 2, ',', '.'); ?> ₺</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                    <?php
+                                    foreach ($g1Data['alt_gruplar'] as $k2 => $g2Data):
+                                        $g2Sefer = $g2Data['toplam']['sefer'];
+                                        $g2Kg    = $g2Data['toplam']['net_kg'];
+                                        $g2Tut   = $g2Data['toplam']['tutar'];
+                                    ?>
+                                        <!-- 2. Seviye Grup Başlığı -->
+                                        <tr class="table-secondary bg-opacity-50">
+                                            <td colspan="<?php echo count($seciliKolonlar); ?>" class="fw-semibold ps-4 py-1">
+                                                <i class="bi bi-box-seam text-primary me-1"></i>
+                                                <?php echo htmlspecialchars($gecerliGruplar[$grup2]); ?>:
+                                                <span class="text-dark ms-1"><?php echo htmlspecialchars($k2); ?></span>
+                                                <span class="badge bg-light text-dark border ms-2"><?php echo number_format($g2Sefer, 0, ',', '.'); ?> Sefer</span>
+                                                <span class="badge bg-light text-dark border ms-1"><?php echo number_format($g2Kg, 0, ',', '.'); ?> kg</span>
+                                            </td>
+                                        </tr>
+                                        <!-- Veri Satırları -->
+                                        <?php foreach ($g2Data['satirlar'] as $r): ?>
+                                            <tr>
+                                                <?php foreach ($seciliKolonlar as $ck): ?>
+                                                    <td class="text-<?php echo $tumKolonlar[$ck]['hizalama']; ?> text-nowrap">
+                                                        <?php echo $renderCell($ck, $r); ?>
+                                                    </td>
+                                                <?php endforeach; ?>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        <!-- 2. Seviye Grup Alt Toplam Satırı -->
+                                        <tr class="table-warning bg-opacity-25 fw-semibold" style="font-size:.8rem">
+                                            <?php
+                                            $subTitle = '<i class="bi bi-calculator me-1"></i> Alt Toplam (' . htmlspecialchars($k2) . '):';
+                                            echo $renderSubtotalCells($subTitle, $g2Sefer, $g2Kg, $g2Tut, $seciliKolonlar, $tumKolonlar);
+                                            ?>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    <!-- 1. Seviye Grup Ara Toplam Satırı -->
+                                    <tr class="table-info bg-opacity-25 fw-bold" style="font-size:.85rem">
+                                        <?php
+                                        $subTitle = '<i class="bi bi-arrow-return-right me-1"></i> ' . htmlspecialchars($k1) . ' Toplamı:';
+                                        echo $renderSubtotalCells($subTitle, $g1Sefer, $g1Kg, $g1Tut, $seciliKolonlar, $tumKolonlar);
+                                        ?>
+                                    </tr>
+                            <?php
+                                endforeach;
+                            elseif ($hasGrup1):
+                                foreach ($esnekGruplanmis as $k1 => $g1Data):
+                                    $g1Sefer = $g1Data['toplam']['sefer'];
+                                    $g1Kg    = $g1Data['toplam']['net_kg'];
+                                    $g1Tut   = $g1Data['toplam']['tutar'];
+                            ?>
+                                    <!-- 1. Seviye Grup Başlığı -->
+                                    <tr class="table-primary border-top border-dark border-2">
+                                        <td colspan="<?php echo count($seciliKolonlar); ?>" class="fw-bold py-2">
+                                            <i class="bi bi-tag-fill me-1"></i>
+                                            <?php echo htmlspecialchars($gecerliGruplar[$grup1]); ?>:
+                                            <span class="text-dark fs-6 ms-1"><?php echo htmlspecialchars($k1); ?></span>
+                                            <span class="badge bg-dark ms-2"><?php echo number_format($g1Sefer, 0, ',', '.'); ?> Sefer</span>
+                                            <span class="badge bg-secondary ms-1"><?php echo number_format($g1Kg, 0, ',', '.'); ?> kg</span>
+                                        </td>
+                                    </tr>
+                                    <?php foreach ($g1Data['satirlar'] as $r): ?>
+                                        <tr>
+                                            <?php foreach ($seciliKolonlar as $ck): ?>
+                                                <td class="text-<?php echo $tumKolonlar[$ck]['hizalama']; ?> text-nowrap">
+                                                    <?php echo $renderCell($ck, $r); ?>
+                                                </td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    <!-- 1. Seviye Grup Alt Toplam Satırı -->
+                                    <tr class="table-info bg-opacity-25 fw-bold" style="font-size:.85rem">
+                                        <?php
+                                        $subTitle = '<i class="bi bi-calculator me-1"></i> ' . htmlspecialchars($k1) . ' Alt Toplamı:';
+                                        echo $renderSubtotalCells($subTitle, $g1Sefer, $g1Kg, $g1Tut, $seciliKolonlar, $tumKolonlar);
+                                        ?>
+                                    </tr>
+                            <?php
+                                endforeach;
+                            else:
+                                foreach ($esnekGruplanmis['duz_liste'] ?? [] as $r):
+                            ?>
+                                    <tr>
+                                        <?php foreach ($seciliKolonlar as $ck): ?>
+                                            <td class="text-<?php echo $tumKolonlar[$ck]['hizalama']; ?> text-nowrap">
+                                                <?php echo $renderCell($ck, $r); ?>
+                                            </td>
+                                        <?php endforeach; ?>
+                                    </tr>
+                            <?php
+                                endforeach;
+                            endif;
+                            ?>
+                        </tbody>
+                        <?php if ($esnekGenelToplam['sefer'] > 0): ?>
+                        <tfoot class="table-dark">
+                            <tr class="fw-bold fs-6">
+                                <?php
+                                $genelBaslik = 'GENEL TOPLAM';
+                                echo $renderSubtotalCells($genelBaslik, $esnekGenelToplam['sefer'], $esnekGenelToplam['net_kg'], $esnekGenelToplam['tutar'], $seciliKolonlar, $tumKolonlar);
+                                ?>
+                            </tr>
+                        </tfoot>
+                        <?php endif; ?>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rapor Özelleştirme Modalı -->
+        <div class="modal fade" id="esnekAyarModal" tabindex="-1" aria-labelledby="esnekAyarModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <form method="get" action="">
+                        <input type="hidden" name="rapor" value="esnek">
+                        <input type="hidden" name="baslangic" value="<?php echo htmlspecialchars($baslangic); ?>">
+                        <input type="hidden" name="bitis" value="<?php echo htmlspecialchars($bitis); ?>">
+                        <input type="hidden" name="cikis_firma" value="<?php echo (int)$cikis_firma; ?>">
+                        <input type="hidden" name="musteri" value="<?php echo htmlspecialchars($musteri); ?>">
+                        <input type="hidden" name="plaka" value="<?php echo htmlspecialchars($plaka); ?>">
+                        <input type="hidden" name="gidecegi_yer" value="<?php echo htmlspecialchars($gidecegi_yer); ?>">
+                        <input type="hidden" name="malzeme" value="<?php echo htmlspecialchars($malzeme); ?>">
+                        <input type="hidden" name="hareket" value="<?php echo htmlspecialchars($hareket); ?>">
+
+                        <div class="modal-header bg-light">
+                            <h5 class="modal-title" id="esnekAyarModalLabel">
+                                <i class="bi bi-sliders text-primary"></i> Raporu & Kolonları Özelleştir
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                        </div>
+                        <div class="modal-body">
+                            <!-- Rapor Başlığı -->
+                            <div class="mb-4">
+                                <label for="modalBaslik" class="form-label fw-bold">
+                                    <i class="bi bi-type me-1"></i> Rapor Başlığı
+                                </label>
+                                <input type="text" class="form-control" id="modalBaslik" name="baslik" value="<?php echo htmlspecialchars($baslik); ?>" placeholder="Örn: Gideceği Yer & Malzeme Bazlı Sevkiyat Raporu">
+                                <div class="form-text">Rapor tablosunun üstünde ve PDF çıktısında görünecek başlık.</div>
+                            </div>
+
+                            <!-- Gruplandırma Alanları -->
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-6">
+                                    <label for="modalGrup1" class="form-label fw-bold">
+                                        <i class="bi bi-layers me-1 text-primary"></i> 1. Seviye Gruplama (Ana Grup)
+                                    </label>
+                                    <select class="form-select" id="modalGrup1" name="grup1">
+                                        <?php foreach ($gecerliGruplar as $gk => $gAd): ?>
+                                            <option value="<?php echo htmlspecialchars($gk); ?>" <?php echo $grup1 === $gk ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($gAd); ?><?php echo $gk === 'gidecegiYer' ? ' (Varsayılan)' : ''; ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text">Ana grup başlıkları ve ara toplamları oluşturur.</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="modalGrup2" class="form-label fw-bold">
+                                        <i class="bi bi-diagram-2 me-1 text-success"></i> 2. Seviye Gruplama (Alt Grup)
+                                    </label>
+                                    <select class="form-select" id="modalGrup2" name="grup2">
+                                        <?php foreach ($gecerliGruplar as $gk => $gAd): ?>
+                                            <option value="<?php echo htmlspecialchars($gk); ?>" <?php echo $grup2 === $gk ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($gAd); ?><?php echo $gk === 'dokumTipi' ? ' (Varsayılan)' : ''; ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text">Ana grup içerisindeki alt grupları ve alt toplamları oluşturur.</div>
+                                </div>
+                            </div>
+
+                            <!-- Gösterilecek Kolonlar -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label fw-bold mb-0">
+                                        <i class="bi bi-table me-1"></i> Gösterilecek Kolonlar
+                                    </label>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAllKolonlar(true)">Tümünü Seç</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setVarsayilanKolonlar()">Varsayılana Sıfırla</button>
+                                    </div>
+                                </div>
+                                <div class="p-3 bg-light rounded border">
+                                    <div class="row g-2">
+                                        <?php foreach ($tumKolonlar as $colKey => $colBilgi):
+                                            $isChecked = in_array($colKey, $seciliKolonlar, true);
+                                            $isDef = in_array($colKey, $varsayilanKolonlar, true);
+                                        ?>
+                                            <div class="col-md-4 col-sm-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input kolon-checkbox" type="checkbox" name="kolonlar[]" value="<?php echo htmlspecialchars($colKey); ?>" id="col_<?php echo htmlspecialchars($colKey); ?>" <?php echo $isChecked ? 'checked' : ''; ?> data-varsayilan="<?php echo $isDef ? '1' : '0'; ?>">
+                                                    <label class="form-check-label user-select-none" for="col_<?php echo htmlspecialchars($colKey); ?>">
+                                                        <?php echo htmlspecialchars($colBilgi['baslik']); ?>
+                                                        <?php if ($isDef): ?>
+                                                        <span class="badge bg-light text-muted border" style="font-size:0.65rem">varsayılan</span>
+                                                        <?php endif; ?>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i> Ayarları Uygula</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        function toggleAllKolonlar(state) {
+            document.querySelectorAll('.kolon-checkbox').forEach(function(cb) {
+                cb.checked = state;
+            });
+        }
+        function setVarsayilanKolonlar() {
+            document.querySelectorAll('.kolon-checkbox').forEach(function(cb) {
+                cb.checked = (cb.getAttribute('data-varsayilan') === '1');
+            });
+            var b = document.getElementById('modalBaslik');
+            if (b) b.value = 'Gideceği Yer & Malzeme Bazlı Sevkiyat Raporu';
+            var g1 = document.getElementById('modalGrup1');
+            if (g1) g1.value = 'gidecegiYer';
+            var g2 = document.getElementById('modalGrup2');
+            if (g2) g2.value = 'dokumTipi';
+        }
+        </script>
+    <?php endif; ?>
+
 <?php endif; ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -1104,6 +1718,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (document.getElementById('musteriSelect')) {
         jQuery('#musteriSelect').select2(musteriOpts);
+    }
+    if (document.getElementById('gidecegiYerSelect')) {
+        jQuery('#gidecegiYerSelect').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Gideceği yer seçin...',
+            allowClear: true,
+            width: '180px',
+            language: {
+                noResults: function() { return 'Sonuç bulunamadı'; },
+                searching: function() { return 'Aranıyor…'; }
+            }
+        });
+    }
+    if (document.getElementById('malzemeSelect')) {
+        jQuery('#malzemeSelect').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Malzeme seçin...',
+            allowClear: true,
+            width: '180px',
+            language: {
+                noResults: function() { return 'Sonuç bulunamadı'; },
+                searching: function() { return 'Aranıyor…'; }
+            }
+        });
     }
 });
 </script>
