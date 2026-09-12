@@ -58,6 +58,7 @@ $grup1  = isset($_GET['grup1']) ? trim((string)$_GET['grup1']) : 'gidecegiYer';
 $grup2  = isset($_GET['grup2']) ? trim((string)$_GET['grup2']) : 'dokumTipi';
 $gidecegi_yer = isset($_GET['gidecegi_yer']) ? trim((string)$_GET['gidecegi_yer']) : '';
 $malzeme = isset($_GET['malzeme']) ? trim((string)$_GET['malzeme']) : '';
+$yon = isset($_GET['yon']) && $_GET['yon'] === 'dikey' ? 'dikey' : 'yatay';
 
 $gecerliGruplar = [
     'gidecegiYer' => 'Gideceği Yer',
@@ -640,7 +641,7 @@ include __DIR__ . '/../includes/header.php';
             <a class="nav-link <?php echo $rapor === 'cari' ? 'active' : ''; ?>" href="?rapor=cari&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&cari_firma=<?php echo urlencode($cari_firma); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&hareket=<?php echo urlencode($hareket); ?>"><i class="bi bi-journal-bookmark"></i> Cari Ekstre</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php echo $rapor === 'esnek' ? 'active' : ''; ?>" href="?rapor=esnek&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&musteri=<?php echo urlencode($musteri); ?>&plaka=<?php echo urlencode($plaka); ?>&hareket=<?php echo urlencode($hareket); ?>&gidecegi_yer=<?php echo urlencode($gidecegi_yer); ?>&malzeme=<?php echo urlencode($malzeme); ?>&grup1=<?php echo urlencode($grup1); ?>&grup2=<?php echo urlencode($grup2); ?>&baslik=<?php echo urlencode($baslik); ?>"><i class="bi bi-diagram-3"></i> Esnek Rapor</a>
+            <a class="nav-link <?php echo $rapor === 'esnek' ? 'active' : ''; ?>" href="?rapor=esnek&baslangic=<?php echo urlencode($baslangic); ?>&bitis=<?php echo urlencode($bitis); ?>&cikis_firma=<?php echo (int)$cikis_firma; ?>&musteri=<?php echo urlencode($musteri); ?>&plaka=<?php echo urlencode($plaka); ?>&hareket=<?php echo urlencode($hareket); ?>&gidecegi_yer=<?php echo urlencode($gidecegi_yer); ?>&malzeme=<?php echo urlencode($malzeme); ?>&grup1=<?php echo urlencode($grup1); ?>&grup2=<?php echo urlencode($grup2); ?>&baslik=<?php echo urlencode($baslik); ?>&yon=<?php echo urlencode($yon); ?>"><i class="bi bi-diagram-3"></i> Esnek Rapor</a>
         </li>
     </ul>
 
@@ -659,7 +660,7 @@ include __DIR__ . '/../includes/header.php';
         if ($gidecegi_yer !== '') $periyotSuffix .= '&gidecegi_yer=' . urlencode($gidecegi_yer);
         if ($malzeme !== '') $periyotSuffix .= '&malzeme=' . urlencode($malzeme);
         if ($plaka !== '') $periyotSuffix .= '&plaka=' . urlencode($plaka);
-        $periyotSuffix .= '&grup1=' . urlencode($grup1) . '&grup2=' . urlencode($grup2) . '&baslik=' . urlencode($baslik);
+        $periyotSuffix .= '&grup1=' . urlencode($grup1) . '&grup2=' . urlencode($grup2) . '&baslik=' . urlencode($baslik) . '&yon=' . urlencode($yon);
         foreach ($seciliKolonlar as $ck) {
             $periyotSuffix .= '&kolonlar[]=' . urlencode($ck);
         }
@@ -688,6 +689,7 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="baslik" value="<?php echo htmlspecialchars($baslik); ?>">
             <input type="hidden" name="grup1" value="<?php echo htmlspecialchars($grup1); ?>">
             <input type="hidden" name="grup2" value="<?php echo htmlspecialchars($grup2); ?>">
+            <input type="hidden" name="yon" id="esnekYonHidden" value="<?php echo htmlspecialchars($yon); ?>">
             <?php foreach ($seciliKolonlar as $ck): ?>
             <input type="hidden" name="kolonlar[]" value="<?php echo htmlspecialchars($ck); ?>">
             <?php endforeach; ?>
@@ -767,13 +769,44 @@ include __DIR__ . '/../includes/header.php';
                 'grup1' => $grup1,
                 'grup2' => $grup2,
                 'baslik' => $baslik,
-                'kolonlar' => $seciliKolonlar
+                'kolonlar' => $seciliKolonlar,
+                'yon' => $yon
             ];
-            $esnekPdfUrl = 'kantar_esnek_pdf.php?' . http_build_query($esnekPdfParams);
+            $esnekPdfParamsYatay = array_merge($esnekPdfParams, ['yon' => 'yatay']);
+            $esnekPdfParamsDikey = array_merge($esnekPdfParams, ['yon' => 'dikey']);
+            $esnekPdfUrlYatay = 'kantar_esnek_pdf.php?' . http_build_query($esnekPdfParamsYatay);
+            $esnekPdfUrlDikey = 'kantar_esnek_pdf.php?' . http_build_query($esnekPdfParamsDikey);
+            $esnekPdfUrlCurrent = ($yon === 'dikey') ? $esnekPdfUrlDikey : $esnekPdfUrlYatay;
             ?>
+            <select name="yon" id="esnekKagitYonuSelect" class="form-select form-select-sm" style="width:105px" title="Kağıt Yönü (PDF & Yazdırma)" onchange="guncelleKagitYonu(this.value)">
+                <option value="yatay" <?php echo $yon === 'yatay' ? 'selected' : ''; ?>>📄 Yatay</option>
+                <option value="dikey" <?php echo $yon === 'dikey' ? 'selected' : ''; ?>>📄 Dikey</option>
+            </select>
             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#esnekAyarModal" title="Grupları ve Kolonları Özelleştir"><i class="bi bi-sliders"></i> Özelleştir</button>
-            <a href="<?php echo htmlspecialchars($esnekPdfUrl); ?>" target="_blank" class="btn btn-sm btn-outline-danger" title="PDF Olarak İndir"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
-            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()" title="Yazdır"><i class="bi bi-printer"></i></button>
+
+            <div class="btn-group btn-group-sm">
+                <a href="<?php echo htmlspecialchars($esnekPdfUrlCurrent); ?>" target="_blank" class="btn btn-outline-danger" id="btnEsnekPdf" title="PDF Olarak İndir"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+                <button type="button" class="btn btn-outline-danger dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">PDF Seçenekleri</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size:0.85rem">
+                    <li><h6 class="dropdown-header">PDF Kağıt Yönü</h6></li>
+                    <li><a class="dropdown-item <?php echo $yon === 'yatay' ? 'active' : ''; ?>" href="<?php echo htmlspecialchars($esnekPdfUrlYatay); ?>" target="_blank"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Yatay PDF (Landscape)</a></li>
+                    <li><a class="dropdown-item <?php echo $yon === 'dikey' ? 'active' : ''; ?>" href="<?php echo htmlspecialchars($esnekPdfUrlDikey); ?>" target="_blank"><i class="bi bi-file-earmark-text me-1"></i> Dikey PDF (Portrait)</a></li>
+                </ul>
+            </div>
+
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" onclick="kantarYazdir()" title="Yazdır"><i class="bi bi-printer"></i></button>
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Yazdırma Seçenekleri</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="font-size:0.85rem">
+                    <li><h6 class="dropdown-header">Yazdırma Kağıt Yönü</h6></li>
+                    <li><a class="dropdown-item <?php echo $yon === 'yatay' ? 'active' : ''; ?>" href="javascript:void(0)" onclick="kantarYazdir('yatay')"><i class="bi bi-file-earmark-spreadsheet me-1"></i> Yatay Yazdır (Landscape)</a></li>
+                    <li><a class="dropdown-item <?php echo $yon === 'dikey' ? 'active' : ''; ?>" href="javascript:void(0)" onclick="kantarYazdir('dikey')"><i class="bi bi-file-earmark-text me-1"></i> Dikey Yazdır (Portrait)</a></li>
+                </ul>
+            </div>
             <?php endif; ?>
         </form>
     </div>
@@ -1616,13 +1649,25 @@ include __DIR__ . '/../includes/header.php';
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
                         </div>
                         <div class="modal-body">
-                            <!-- Rapor Başlığı -->
-                            <div class="mb-4">
-                                <label for="modalBaslik" class="form-label fw-bold">
-                                    <i class="bi bi-type me-1"></i> Rapor Başlığı
-                                </label>
-                                <input type="text" class="form-control" id="modalBaslik" name="baslik" value="<?php echo htmlspecialchars($baslik); ?>" placeholder="Örn: Gideceği Yer & Malzeme Bazlı Sevkiyat Raporu">
-                                <div class="form-text">Rapor tablosunun üstünde ve PDF çıktısında görünecek başlık.</div>
+                            <!-- Rapor Başlığı ve Kağıt Yönü -->
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-7">
+                                    <label for="modalBaslik" class="form-label fw-bold">
+                                        <i class="bi bi-type me-1"></i> Rapor Başlığı
+                                    </label>
+                                    <input type="text" class="form-control" id="modalBaslik" name="baslik" value="<?php echo htmlspecialchars($baslik); ?>" placeholder="Örn: Gideceği Yer & Malzeme Bazlı Sevkiyat Raporu">
+                                    <div class="form-text">Rapor tablosunun üstünde ve çıktıda görünecek başlık.</div>
+                                </div>
+                                <div class="col-md-5">
+                                    <label for="modalYon" class="form-label fw-bold">
+                                        <i class="bi bi-file-earmark me-1 text-secondary"></i> Kağıt Yönü (PDF & Yazdır)
+                                    </label>
+                                    <select class="form-select" id="modalYon" name="yon" onchange="guncelleKagitYonu(this.value)">
+                                        <option value="yatay" <?php echo $yon === 'yatay' ? 'selected' : ''; ?>>📄 Yatay (Landscape)</option>
+                                        <option value="dikey" <?php echo $yon === 'dikey' ? 'selected' : ''; ?>>📄 Dikey (Portrait)</option>
+                                    </select>
+                                    <div class="form-text">Çok kolonlu tablolarda Yatay önerilir.</div>
+                                </div>
                             </div>
 
                             <!-- Gruplandırma Alanları -->
@@ -1713,6 +1758,43 @@ include __DIR__ . '/../includes/header.php';
             if (g1) g1.value = 'gidecegiYer';
             var g2 = document.getElementById('modalGrup2');
             if (g2) g2.value = 'dokumTipi';
+            var my = document.getElementById('modalYon');
+            if (my) my.value = 'yatay';
+        }
+
+        function guncelleKagitYonu(y) {
+            var styleEl = document.getElementById('printOrientationDynamic');
+            if (styleEl) {
+                styleEl.innerHTML = '@media print { @page { size: A4 ' + (y === 'dikey' ? 'portrait' : 'landscape') + ' !important; margin: 6mm 8mm !important; } }';
+            }
+            var hid = document.getElementById('esnekYonHidden');
+            if (hid) hid.value = y;
+            var modalY = document.getElementById('modalYon');
+            if (modalY && modalY.value !== y) modalY.value = y;
+            var selY = document.getElementById('esnekKagitYonuSelect');
+            if (selY && selY.value !== y) selY.value = y;
+
+            // PDF linkini de dinamik olarak güncelle
+            var pdfBtn = document.getElementById('btnEsnekPdf');
+            if (pdfBtn) {
+                try {
+                    var url = new URL(pdfBtn.href, window.location.origin);
+                    url.searchParams.set('yon', y);
+                    pdfBtn.href = url.pathname + url.search;
+                } catch(e) {}
+            }
+        }
+
+        function kantarYazdir(yon) {
+            if (yon) {
+                guncelleKagitYonu(yon);
+            } else {
+                var sel = document.getElementById('esnekKagitYonuSelect');
+                if (sel) guncelleKagitYonu(sel.value);
+            }
+            setTimeout(function() {
+                window.print();
+            }, 50);
         }
         </script>
     <?php endif; ?>
@@ -1721,15 +1803,19 @@ include __DIR__ . '/../includes/header.php';
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style id="printOrientationDynamic">
+@media print {
+    @page {
+        size: A4 <?php echo ($yon === 'dikey') ? 'portrait' : 'landscape'; ?> !important;
+        margin: 6mm 8mm !important;
+    }
+}
+</style>
 <style>
 .select2-container--bootstrap-5 .select2-selection { min-height: 31px; }
 .select2-container { min-width: 200px; }
 
 @media print {
-    @page {
-        size: A4 landscape;
-        margin: 6mm 8mm;
-    }
     nav, .navbar, footer, .no-print, .d-print-none, form, .btn, .modal, .modal-backdrop, .alert, .select2-container {
         display: none !important;
     }

@@ -39,6 +39,9 @@ $malzeme      = isset($_GET['malzeme'])      ? trim((string)$_GET['malzeme']) : 
 $baslik = isset($_GET['baslik']) && trim((string)$_GET['baslik']) !== '' ? trim((string)$_GET['baslik']) : 'Gideceği Yer & Malzeme Bazlı Sevkiyat Raporu';
 $grup1  = isset($_GET['grup1']) ? trim((string)$_GET['grup1']) : 'gidecegiYer';
 $grup2  = isset($_GET['grup2']) ? trim((string)$_GET['grup2']) : 'dokumTipi';
+$yon    = isset($_GET['yon']) && $_GET['yon'] === 'dikey' ? 'dikey' : 'yatay';
+$pdfOrientation = ($yon === 'dikey') ? 'P' : 'L';
+$usableWidth = ($yon === 'dikey') ? 194.0 : 280.0;
 
 $gecerliGruplar = [
     'gidecegiYer' => 'Gideceği Yer',
@@ -81,7 +84,7 @@ if (isset($_GET['kolonlar']) && is_array($_GET['kolonlar'])) {
     $seciliKolonlar = $varsayilanKolonlar;
 }
 
-// Kolon genişliklerini 280mm toplam alana ölçekle
+// Kolon genişliklerini toplam alana ölçekle
 $totalWeight = 0;
 foreach ($seciliKolonlar as $ck) {
     $totalWeight += $tumKolonlar[$ck]['weight'];
@@ -90,9 +93,9 @@ $colW = [];
 $totalAllocated = 0;
 foreach ($seciliKolonlar as $idx => $ck) {
     if ($idx === count($seciliKolonlar) - 1) {
-        $colW[$ck] = round(280 - $totalAllocated, 1);
+        $colW[$ck] = round($usableWidth - $totalAllocated, 1);
     } else {
-        $w = round(($tumKolonlar[$ck]['weight'] / $totalWeight) * 280, 1);
+        $w = round(($tumKolonlar[$ck]['weight'] / $totalWeight) * $usableWidth, 1);
         $colW[$ck] = $w;
         $totalAllocated += $w;
     }
@@ -271,7 +274,7 @@ class EsnekPDF extends TCPDF {
     }
 }
 
-$pdf = new EsnekPDF('L', PDF_UNIT, 'A4', true, 'UTF-8', false);
+$pdf = new EsnekPDF($pdfOrientation, PDF_UNIT, 'A4', true, 'UTF-8', false);
 $pdf->setRaporBaslik($baslik);
 $pdf->SetCreator('OYS - Ocak Yönetim Sistemi');
 $pdf->SetAuthor('ZERSOFT');
@@ -337,8 +340,12 @@ $renderVal = function($colKey, $r) {
     }
 };
 
-$printHeaders = function() use ($pdf, $seciliKolonlar, $tumKolonlar, $colW) {
-    $pdf->SetFont('dejavusans', 'B', 7);
+$headerFontSize   = ($yon === 'dikey') ? 6.0 : 7.0;
+$rowFontSize      = ($yon === 'dikey') ? 5.5 : 6.5;
+$subtotalFontSize = ($yon === 'dikey') ? 5.8 : 6.5;
+
+$printHeaders = function() use ($pdf, $seciliKolonlar, $tumKolonlar, $colW, $headerFontSize) {
+    $pdf->SetFont('dejavusans', 'B', $headerFontSize);
     $pdf->SetFillColor(230, 230, 230);
     foreach ($seciliKolonlar as $ck) {
         $pdf->Cell($colW[$ck], 5.5, $tumKolonlar[$ck]['baslik'], 1, 0, $tumKolonlar[$ck]['hizalama'], true);
@@ -346,8 +353,9 @@ $printHeaders = function() use ($pdf, $seciliKolonlar, $tumKolonlar, $colW) {
     $pdf->Ln();
 };
 
-$printSubtotalRow = function($label, $sefer, $kg, $tutar, $fillR, $fillG, $fillB, $fontSize = 6.5) use ($pdf, $seciliKolonlar, $tumKolonlar, $colW) {
-    $pdf->SetFont('dejavusans', 'B', $fontSize);
+$printSubtotalRow = function($label, $sefer, $kg, $tutar, $fillR, $fillG, $fillB, $fontSize = null) use ($pdf, $seciliKolonlar, $tumKolonlar, $colW, $subtotalFontSize) {
+    $fSize = ($fontSize !== null) ? $fontSize : $subtotalFontSize;
+    $pdf->SetFont('dejavusans', 'B', $fSize);
     $pdf->SetFillColor($fillR, $fillG, $fillB);
 
     $summaryColKeys = ['dokum_net_kg', 'tutar', 'genel_tutar', 'brim_fiyat', 'kdv'];
@@ -399,11 +407,12 @@ $printSubtotalRow = function($label, $sefer, $kg, $tutar, $fillR, $fillG, $fillB
     $pdf->Ln();
 };
 
+// Tablo Başlıklarını Yaz
 $printHeaders();
 
 if (empty($esnekGruplanmis) || ($hasGrup1 && empty($esnekGruplanmis)) || (!$hasGrup1 && empty($esnekGruplanmis['duz_liste']))) {
-    $pdf->SetFont('dejavusans', '', 8);
-    $pdf->Cell(280, 8, 'Kayıt bulunamadı.', 1, 1, 'C');
+    $pdf->SetFont('dejavusans', 'I', 8);
+    $pdf->Cell($usableWidth, 8, 'Seçilen kriterlere uygun kayıt bulunamadı.', 1, 1, 'C');
 } elseif ($hasGrup1 && $hasGrup2) {
     foreach ($esnekGruplanmis as $k1 => $g1Data) {
         $g1Sefer = $g1Data['toplam']['sefer'];
