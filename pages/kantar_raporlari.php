@@ -1408,8 +1408,10 @@ include __DIR__ . '/../includes/header.php';
                     <table class="table table-hover table-sm table-bordered align-middle mb-0" style="font-size:.85rem">
                         <thead class="table-light">
                             <tr>
-                                <?php foreach ($seciliKolonlar as $colKey): ?>
-                                    <th class="text-<?php echo $tumKolonlar[$colKey]['hizalama']; ?> text-nowrap">
+                                <?php foreach ($seciliKolonlar as $colKey):
+                                    $isExpCol = in_array($colKey, ['malzeme', 'gidecegi_yer', 'musteri'], true);
+                                ?>
+                                    <th class="text-<?php echo $tumKolonlar[$colKey]['hizalama']; ?> <?php echo $isExpCol ? '' : 'text-nowrap'; ?>" style="<?php echo $isExpCol ? 'min-width:180px;' : 'width:1%;'; ?>">
                                         <?php echo htmlspecialchars($tumKolonlar[$colKey]['baslik']); ?>
                                     </th>
                                 <?php endforeach; ?>
@@ -1466,8 +1468,10 @@ include __DIR__ . '/../includes/header.php';
                                         <!-- Veri Satırları -->
                                         <?php foreach ($g2Data['satirlar'] as $r): ?>
                                             <tr>
-                                                <?php foreach ($seciliKolonlar as $ck): ?>
-                                                    <td class="text-<?php echo $tumKolonlar[$ck]['hizalama']; ?> text-nowrap">
+                                                <?php foreach ($seciliKolonlar as $ck):
+                                                    $isExp = in_array($ck, ['malzeme', 'gidecegi_yer', 'musteri'], true);
+                                                ?>
+                                                    <td class="text-<?php echo $tumKolonlar[$ck]['hizalama']; ?> <?php echo $isExp ? '' : 'text-nowrap'; ?>">
                                                         <?php echo $renderCell($ck, $r); ?>
                                                     </td>
                                                 <?php endforeach; ?>
@@ -1508,8 +1512,10 @@ include __DIR__ . '/../includes/header.php';
                                     </tr>
                                     <?php foreach ($g1Data['satirlar'] as $r): ?>
                                         <tr>
-                                            <?php foreach ($seciliKolonlar as $ck): ?>
-                                                <td class="text-<?php echo $tumKolonlar[$ck]['hizalama']; ?> text-nowrap">
+                                            <?php foreach ($seciliKolonlar as $ck):
+                                                $isExp = in_array($ck, ['malzeme', 'gidecegi_yer', 'musteri'], true);
+                                            ?>
+                                                <td class="text-<?php echo $tumKolonlar[$ck]['hizalama']; ?> <?php echo $isExp ? '' : 'text-nowrap'; ?>">
                                                     <?php echo $renderCell($ck, $r); ?>
                                                 </td>
                                             <?php endforeach; ?>
@@ -1528,8 +1534,10 @@ include __DIR__ . '/../includes/header.php';
                                 foreach ($esnekGruplanmis['duz_liste'] ?? [] as $r):
                             ?>
                                     <tr>
-                                        <?php foreach ($seciliKolonlar as $ck): ?>
-                                            <td class="text-<?php echo $tumKolonlar[$ck]['hizalama']; ?> text-nowrap">
+                                        <?php foreach ($seciliKolonlar as $ck):
+                                            $isExp = in_array($ck, ['malzeme', 'gidecegi_yer', 'musteri'], true);
+                                        ?>
+                                            <td class="text-<?php echo $tumKolonlar[$ck]['hizalama']; ?> <?php echo $isExp ? '' : 'text-nowrap'; ?>">
                                                 <?php echo $renderCell($ck, $r); ?>
                                             </td>
                                         <?php endforeach; ?>

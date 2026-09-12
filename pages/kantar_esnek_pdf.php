@@ -53,21 +53,21 @@ if (!array_key_exists($grup1, $gecerliGruplar)) $grup1 = 'gidecegiYer';
 if (!array_key_exists($grup2, $gecerliGruplar)) $grup2 = 'dokumTipi';
 
 $tumKolonlar = [
-    'kantar_fis'    => ['baslik' => 'KantarFiş', 'hizalama' => 'L', 'weight' => 18],
-    'irsaliye_no'   => ['baslik' => 'irsaliyeNo', 'hizalama' => 'L', 'weight' => 20],
-    'tarih'         => ['baslik' => 'tarih', 'hizalama' => 'C', 'weight' => 17],
-    'saat'          => ['baslik' => 'saat', 'hizalama' => 'C', 'weight' => 14],
-    'plaka'         => ['baslik' => 'plaka', 'hizalama' => 'L', 'weight' => 18],
-    'dokum_net_kg'  => ['baslik' => 'dokumNetKilo', 'hizalama' => 'R', 'weight' => 22],
-    'malzeme'       => ['baslik' => 'Malzeme', 'hizalama' => 'L', 'weight' => 30],
-    'gidecegi_yer'  => ['baslik' => 'gidecegiYer', 'hizalama' => 'L', 'weight' => 26],
-    'musteri'       => ['baslik' => 'Müşteri', 'hizalama' => 'L', 'weight' => 30],
-    'brim_fiyat'    => ['baslik' => 'Birim Fiyat', 'hizalama' => 'R', 'weight' => 16],
-    'tutar'         => ['baslik' => 'Tutar', 'hizalama' => 'R', 'weight' => 20],
-    'kdv'           => ['baslik' => 'KDV', 'hizalama' => 'R', 'weight' => 16],
-    'genel_tutar'   => ['baslik' => 'Genel Tutar', 'hizalama' => 'R', 'weight' => 22],
-    'hareket'       => ['baslik' => 'Hareket', 'hizalama' => 'C', 'weight' => 15],
-    'cikis_firmasi' => ['baslik' => 'Çıkış Firması', 'hizalama' => 'L', 'weight' => 25]
+    'kantar_fis'    => ['baslik' => 'KantarFiş', 'hizalama' => 'L', 'weight' => 14],
+    'irsaliye_no'   => ['baslik' => 'irsaliyeNo', 'hizalama' => 'L', 'weight' => 19],
+    'tarih'         => ['baslik' => 'tarih', 'hizalama' => 'C', 'weight' => 15],
+    'saat'          => ['baslik' => 'saat', 'hizalama' => 'C', 'weight' => 12],
+    'plaka'         => ['baslik' => 'plaka', 'hizalama' => 'L', 'weight' => 15],
+    'dokum_net_kg'  => ['baslik' => 'dokumNetKilo', 'hizalama' => 'R', 'weight' => 18],
+    'malzeme'       => ['baslik' => 'Malzeme', 'hizalama' => 'L', 'weight' => 65],
+    'gidecegi_yer'  => ['baslik' => 'gidecegiYer', 'hizalama' => 'L', 'weight' => 65],
+    'musteri'       => ['baslik' => 'Müşteri', 'hizalama' => 'L', 'weight' => 60],
+    'brim_fiyat'    => ['baslik' => 'Birim Fiyat', 'hizalama' => 'R', 'weight' => 14],
+    'tutar'         => ['baslik' => 'Tutar', 'hizalama' => 'R', 'weight' => 18],
+    'kdv'           => ['baslik' => 'KDV', 'hizalama' => 'R', 'weight' => 14],
+    'genel_tutar'   => ['baslik' => 'Genel Tutar', 'hizalama' => 'R', 'weight' => 19],
+    'hareket'       => ['baslik' => 'Hareket', 'hizalama' => 'C', 'weight' => 13],
+    'cikis_firmasi' => ['baslik' => 'Çıkış Firması', 'hizalama' => 'L', 'weight' => 24]
 ];
 
 $varsayilanKolonlar = ['kantar_fis', 'irsaliye_no', 'tarih', 'saat', 'plaka', 'dokum_net_kg', 'malzeme', 'gidecegi_yer'];
@@ -432,7 +432,8 @@ if (empty($esnekGruplanmis) || ($hasGrup1 && empty($esnekGruplanmis)) || (!$hasG
             $fill = false;
             foreach ($g2Data['satirlar'] as $r) {
                 foreach ($seciliKolonlar as $ck) {
-                    $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, 30), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill);
+                    $maxChar = (int)max(15, round($colW[$ck] * 0.9));
+                    $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, $maxChar), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill);
                 }
                 $pdf->Ln();
                 $fill = !$fill;
@@ -461,7 +462,8 @@ if (empty($esnekGruplanmis) || ($hasGrup1 && empty($esnekGruplanmis)) || (!$hasG
         $fill = false;
         foreach ($g1Data['satirlar'] as $r) {
             foreach ($seciliKolonlar as $ck) {
-                $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, 30), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill);
+                $maxChar = (int)max(15, round($colW[$ck] * 0.9));
+                $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, $maxChar), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill);
             }
             $pdf->Ln();
             $fill = !$fill;
@@ -475,7 +477,8 @@ if (empty($esnekGruplanmis) || ($hasGrup1 && empty($esnekGruplanmis)) || (!$hasG
     $fill = false;
     foreach ($esnekGruplanmis['duz_liste'] ?? [] as $r) {
         foreach ($seciliKolonlar as $ck) {
-            $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, 30), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill);
+            $maxChar = (int)max(15, round($colW[$ck] * 0.9));
+            $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, $maxChar), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill);
         }
         $pdf->Ln();
         $fill = !$fill;
