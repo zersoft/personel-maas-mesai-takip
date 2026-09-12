@@ -56,21 +56,21 @@ if (!array_key_exists($grup1, $gecerliGruplar)) $grup1 = 'gidecegiYer';
 if (!array_key_exists($grup2, $gecerliGruplar)) $grup2 = 'dokumTipi';
 
 $tumKolonlar = [
-    'kantar_fis'    => ['baslik' => 'KantarFiş', 'hizalama' => 'L', 'weight' => 14],
-    'irsaliye_no'   => ['baslik' => 'irsaliyeNo', 'hizalama' => 'L', 'weight' => 19],
-    'tarih'         => ['baslik' => 'tarih', 'hizalama' => 'C', 'weight' => 15],
-    'saat'          => ['baslik' => 'saat', 'hizalama' => 'C', 'weight' => 12],
-    'plaka'         => ['baslik' => 'plaka', 'hizalama' => 'L', 'weight' => 15],
-    'dokum_net_kg'  => ['baslik' => 'dokumNetKilo', 'hizalama' => 'R', 'weight' => 18],
-    'malzeme'       => ['baslik' => 'Malzeme', 'hizalama' => 'L', 'weight' => 65],
-    'gidecegi_yer'  => ['baslik' => 'gidecegiYer', 'hizalama' => 'L', 'weight' => 65],
-    'musteri'       => ['baslik' => 'Müşteri', 'hizalama' => 'L', 'weight' => 60],
-    'brim_fiyat'    => ['baslik' => 'Birim Fiyat', 'hizalama' => 'R', 'weight' => 14],
-    'tutar'         => ['baslik' => 'Tutar', 'hizalama' => 'R', 'weight' => 18],
-    'kdv'           => ['baslik' => 'KDV', 'hizalama' => 'R', 'weight' => 14],
-    'genel_tutar'   => ['baslik' => 'Genel Tutar', 'hizalama' => 'R', 'weight' => 19],
-    'hareket'       => ['baslik' => 'Hareket', 'hizalama' => 'C', 'weight' => 13],
-    'cikis_firmasi' => ['baslik' => 'Çıkış Firması', 'hizalama' => 'L', 'weight' => 24]
+    'kantar_fis'    => ['baslik' => 'KantarFiş',   'hizalama' => 'L', 'min_w' => 13.0, 'is_flex' => false],
+    'irsaliye_no'   => ['baslik' => 'irsaliyeNo',  'hizalama' => 'L', 'min_w' => 24.0, 'is_flex' => false],
+    'tarih'         => ['baslik' => 'tarih',        'hizalama' => 'C', 'min_w' => 16.0, 'is_flex' => false],
+    'saat'          => ['baslik' => 'saat',         'hizalama' => 'C', 'min_w' => 13.0, 'is_flex' => false],
+    'plaka'         => ['baslik' => 'plaka',        'hizalama' => 'L', 'min_w' => 16.0, 'is_flex' => false],
+    'dokum_net_kg'  => ['baslik' => 'dokumNetKilo', 'hizalama' => 'R', 'min_w' => 18.0, 'is_flex' => false],
+    'malzeme'       => ['baslik' => 'Malzeme',      'hizalama' => 'L', 'min_w' => 28.0, 'is_flex' => true],
+    'gidecegi_yer'  => ['baslik' => 'gidecegiYer',  'hizalama' => 'L', 'min_w' => 28.0, 'is_flex' => true],
+    'musteri'       => ['baslik' => 'Müşteri',      'hizalama' => 'L', 'min_w' => 28.0, 'is_flex' => true],
+    'brim_fiyat'    => ['baslik' => 'Birim Fiyat',  'hizalama' => 'R', 'min_w' => 15.0, 'is_flex' => false],
+    'tutar'         => ['baslik' => 'Tutar',        'hizalama' => 'R', 'min_w' => 18.0, 'is_flex' => false],
+    'kdv'           => ['baslik' => 'KDV',          'hizalama' => 'R', 'min_w' => 14.0, 'is_flex' => false],
+    'genel_tutar'   => ['baslik' => 'Genel Tutar',  'hizalama' => 'R', 'min_w' => 19.0, 'is_flex' => false],
+    'hareket'       => ['baslik' => 'Hareket',      'hizalama' => 'C', 'min_w' => 14.0, 'is_flex' => false],
+    'cikis_firmasi' => ['baslik' => 'Çıkış Firması', 'hizalama' => 'L', 'min_w' => 24.0, 'is_flex' => false]
 ];
 
 $varsayilanKolonlar = ['kantar_fis', 'irsaliye_no', 'tarih', 'saat', 'plaka', 'dokum_net_kg', 'malzeme', 'gidecegi_yer'];
@@ -84,20 +84,47 @@ if (isset($_GET['kolonlar']) && is_array($_GET['kolonlar'])) {
     $seciliKolonlar = $varsayilanKolonlar;
 }
 
-// Kolon genişliklerini toplam alana ölçekle
-$totalWeight = 0;
+// Akıllı Kolon Genişliği Dağıtımı:
+// Sabit alanların minimum genişliği korunur, kalan genişlik esnek alanlara (Malzeme, Gideceği Yer vb.) paylaştırılır.
+$totalMin = 0;
+$flexKeys = [];
 foreach ($seciliKolonlar as $ck) {
-    $totalWeight += $tumKolonlar[$ck]['weight'];
+    $totalMin += $tumKolonlar[$ck]['min_w'];
+    if (!empty($tumKolonlar[$ck]['is_flex'])) {
+        $flexKeys[] = $ck;
+    }
 }
+
 $colW = [];
-$totalAllocated = 0;
-foreach ($seciliKolonlar as $idx => $ck) {
-    if ($idx === count($seciliKolonlar) - 1) {
-        $colW[$ck] = round($usableWidth - $totalAllocated, 1);
-    } else {
-        $w = round(($tumKolonlar[$ck]['weight'] / $totalWeight) * $usableWidth, 1);
-        $colW[$ck] = $w;
-        $totalAllocated += $w;
+if ($usableWidth >= $totalMin) {
+    $extraWidth = $usableWidth - $totalMin;
+    $flexCount = count($flexKeys);
+    $allocated = 0;
+    foreach ($seciliKolonlar as $idx => $ck) {
+        $w = $tumKolonlar[$ck]['min_w'];
+        if ($flexCount > 0 && in_array($ck, $flexKeys, true)) {
+            $w += ($extraWidth / $flexCount);
+        } elseif ($flexCount === 0) {
+            $w += ($extraWidth * ($tumKolonlar[$ck]['min_w'] / $totalMin));
+        }
+        $w = round($w, 1);
+        if ($idx === count($seciliKolonlar) - 1) {
+            $colW[$ck] = round($usableWidth - $allocated, 1);
+        } else {
+            $colW[$ck] = $w;
+            $allocated += $w;
+        }
+    }
+} else {
+    $allocated = 0;
+    foreach ($seciliKolonlar as $idx => $ck) {
+        if ($idx === count($seciliKolonlar) - 1) {
+            $colW[$ck] = round($usableWidth - $allocated, 1);
+        } else {
+            $w = round(($tumKolonlar[$ck]['min_w'] / $totalMin) * $usableWidth, 1);
+            $colW[$ck] = $w;
+            $allocated += $w;
+        }
     }
 }
 
@@ -348,7 +375,7 @@ $printHeaders = function() use ($pdf, $seciliKolonlar, $tumKolonlar, $colW, $hea
     $pdf->SetFont('dejavusans', 'B', $headerFontSize);
     $pdf->SetFillColor(230, 230, 230);
     foreach ($seciliKolonlar as $ck) {
-        $pdf->Cell($colW[$ck], 5.5, $tumKolonlar[$ck]['baslik'], 1, 0, $tumKolonlar[$ck]['hizalama'], true);
+        $pdf->Cell($colW[$ck], 5.5, $tumKolonlar[$ck]['baslik'], 1, 0, $tumKolonlar[$ck]['hizalama'], true, '', 1);
     }
     $pdf->Ln();
 };
@@ -375,14 +402,14 @@ $printSubtotalRow = function($label, $sefer, $kg, $tutar, $fillR, $fillG, $fillB
             $align = $tumKolonlar[$ck]['hizalama'];
             $w = $colW[$ck];
             if (!$firstTextDone) {
-                $pdf->Cell($w, 5, $txt, 1, 0, 'L', true);
+                $pdf->Cell($w, 5, $txt, 1, 0, 'L', true, '', 1);
                 $firstTextDone = true;
             } elseif ($ck === 'dokum_net_kg') {
-                $pdf->Cell($w, 5, number_format($kg, 0, ',', '.') . ' kg', 1, 0, 'R', true);
+                $pdf->Cell($w, 5, number_format($kg, 0, ',', '.') . ' kg', 1, 0, 'R', true, '', 1);
             } elseif ($ck === 'tutar' || $ck === 'genel_tutar') {
-                $pdf->Cell($w, 5, number_format($tutar, 2, ',', '.') . ' ₺', 1, 0, 'R', true);
+                $pdf->Cell($w, 5, number_format($tutar, 2, ',', '.') . ' ₺', 1, 0, 'R', true, '', 1);
             } else {
-                $pdf->Cell($w, 5, '', 1, 0, 'L', true);
+                $pdf->Cell($w, 5, '', 1, 0, 'L', true, '', 1);
             }
         }
     } else {
@@ -390,17 +417,17 @@ $printSubtotalRow = function($label, $sefer, $kg, $tutar, $fillR, $fillG, $fillB
         for ($i = 0; $i < $firstSummaryIdx; $i++) {
             $mergedW += $colW[$seciliKolonlar[$i]];
         }
-        $pdf->Cell($mergedW, 5, $txt, 1, 0, 'L', true);
+        $pdf->Cell($mergedW, 5, $txt, 1, 0, 'L', true, '', 1);
 
         for ($i = $firstSummaryIdx; $i < count($seciliKolonlar); $i++) {
             $ck = $seciliKolonlar[$i];
             $w = $colW[$ck];
             if ($ck === 'dokum_net_kg') {
-                $pdf->Cell($w, 5, number_format($kg, 0, ',', '.') . ' kg', 1, 0, 'R', true);
+                $pdf->Cell($w, 5, number_format($kg, 0, ',', '.') . ' kg', 1, 0, 'R', true, '', 1);
             } elseif ($ck === 'tutar' || $ck === 'genel_tutar') {
-                $pdf->Cell($w, 5, number_format($tutar, 2, ',', '.') . ' ₺', 1, 0, 'R', true);
+                $pdf->Cell($w, 5, number_format($tutar, 2, ',', '.') . ' ₺', 1, 0, 'R', true, '', 1);
             } else {
-                $pdf->Cell($w, 5, '', 1, 0, 'L', true);
+                $pdf->Cell($w, 5, '', 1, 0, 'L', true, '', 1);
             }
         }
     }
@@ -424,7 +451,7 @@ if (empty($esnekGruplanmis) || ($hasGrup1 && empty($esnekGruplanmis)) || (!$hasG
         $pdf->SetFillColor(217, 237, 247);
         $headerText = $gecerliGruplar[$grup1] . ': ' . $k1 . ' | ' . number_format($g1Sefer, 0, ',', '.') . ' Sefer - ' . number_format($g1Kg, 0, ',', '.') . ' kg';
         if ($g1Tut > 0) $headerText .= ' - ' . number_format($g1Tut, 2, ',', '.') . ' ₺';
-        $pdf->Cell(280, 6, $headerText, 1, 1, 'L', true);
+        $pdf->Cell($usableWidth, 6, $headerText, 1, 1, 'L', true);
 
         foreach ($g1Data['alt_gruplar'] as $k2 => $g2Data) {
             $g2Sefer = $g2Data['toplam']['sefer'];
@@ -434,26 +461,26 @@ if (empty($esnekGruplanmis) || ($hasGrup1 && empty($esnekGruplanmis)) || (!$hasG
             // 2. Seviye Grup Başlığı
             $pdf->SetFont('dejavusans', 'B', 7);
             $pdf->SetFillColor(245, 245, 245);
-            $pdf->Cell(280, 5, '    -- ' . $gecerliGruplar[$grup2] . ': ' . $k2 . ' (' . number_format($g2Sefer, 0, ',', '.') . ' Sefer)', 1, 1, 'L', true);
+            $pdf->Cell($usableWidth, 5, '    -- ' . $gecerliGruplar[$grup2] . ': ' . $k2 . ' (' . number_format($g2Sefer, 0, ',', '.') . ' Sefer)', 1, 1, 'L', true);
 
             // Satırlar
-            $pdf->SetFont('dejavusans', '', 6.5);
+            $pdf->SetFont('dejavusans', '', $rowFontSize);
             $fill = false;
             foreach ($g2Data['satirlar'] as $r) {
                 foreach ($seciliKolonlar as $ck) {
-                    $maxChar = (int)max(15, round($colW[$ck] * 0.9));
-                    $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, $maxChar), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill);
+                    $maxChar = (int)max(12, round($colW[$ck] * 0.9));
+                    $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, $maxChar), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill, '', 1);
                 }
                 $pdf->Ln();
                 $fill = !$fill;
             }
 
             // 2. Seviye Alt Toplam
-            $printSubtotalRow('    Alt Toplam (' . $k2 . ')', $g2Sefer, $g2Kg, $g2Tut, 252, 248, 227, 6.5);
+            $printSubtotalRow('    Alt Toplam (' . $k2 . ')', $g2Sefer, $g2Kg, $g2Tut, 252, 248, 227, $subtotalFontSize);
         }
 
         // 1. Seviye Ara Toplam
-        $printSubtotalRow($k1 . ' Toplamı', $g1Sefer, $g1Kg, $g1Tut, 232, 240, 254, 7);
+        $printSubtotalRow($k1 . ' Toplamı', $g1Sefer, $g1Kg, $g1Tut, 232, 240, 254, ($yon === 'dikey' ? 6.2 : 7.0));
     }
 } elseif ($hasGrup1) {
     foreach ($esnekGruplanmis as $k1 => $g1Data) {
@@ -464,30 +491,30 @@ if (empty($esnekGruplanmis) || ($hasGrup1 && empty($esnekGruplanmis)) || (!$hasG
         // 1. Seviye Grup Başlığı
         $pdf->SetFont('dejavusans', 'B', 8);
         $pdf->SetFillColor(217, 237, 247);
-        $pdf->Cell(280, 6, $gecerliGruplar[$grup1] . ': ' . $k1 . ' | ' . number_format($g1Sefer, 0, ',', '.') . ' Sefer - ' . number_format($g1Kg, 0, ',', '.') . ' kg', 1, 1, 'L', true);
+        $pdf->Cell($usableWidth, 6, $gecerliGruplar[$grup1] . ': ' . $k1 . ' | ' . number_format($g1Sefer, 0, ',', '.') . ' Sefer - ' . number_format($g1Kg, 0, ',', '.') . ' kg', 1, 1, 'L', true);
 
         // Satırlar
-        $pdf->SetFont('dejavusans', '', 6.5);
+        $pdf->SetFont('dejavusans', '', $rowFontSize);
         $fill = false;
         foreach ($g1Data['satirlar'] as $r) {
             foreach ($seciliKolonlar as $ck) {
-                $maxChar = (int)max(15, round($colW[$ck] * 0.9));
-                $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, $maxChar), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill);
+                $maxChar = (int)max(12, round($colW[$ck] * 0.9));
+                $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, $maxChar), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill, '', 1);
             }
             $pdf->Ln();
             $fill = !$fill;
         }
 
         // 1. Seviye Alt Toplam
-        $printSubtotalRow($k1 . ' Alt Toplamı', $g1Sefer, $g1Kg, $g1Tut, 232, 240, 254, 7);
+        $printSubtotalRow($k1 . ' Alt Toplamı', $g1Sefer, $g1Kg, $g1Tut, 232, 240, 254, ($yon === 'dikey' ? 6.2 : 7.0));
     }
 } else {
-    $pdf->SetFont('dejavusans', '', 6.5);
+    $pdf->SetFont('dejavusans', '', $rowFontSize);
     $fill = false;
     foreach ($esnekGruplanmis['duz_liste'] ?? [] as $r) {
         foreach ($seciliKolonlar as $ck) {
-            $maxChar = (int)max(15, round($colW[$ck] * 0.9));
-            $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, $maxChar), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill);
+            $maxChar = (int)max(12, round($colW[$ck] * 0.9));
+            $pdf->Cell($colW[$ck], 4.5, mb_substr($renderVal($ck, $r), 0, $maxChar), 1, 0, $tumKolonlar[$ck]['hizalama'], $fill, '', 1);
         }
         $pdf->Ln();
         $fill = !$fill;

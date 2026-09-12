@@ -1858,6 +1858,8 @@ include __DIR__ . '/../includes/header.php';
         border: 1px solid #94a3b8 !important;
         padding: 2.5px 4px !important;
         line-height: 1.2 !important;
+        min-width: 0 !important;
+        word-break: break-word !important;
     }
     thead {
         display: table-header-group !important;
