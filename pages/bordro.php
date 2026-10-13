@@ -25,19 +25,25 @@ $personel_filtre = isset($_GET['personel_id']) ? (int)$_GET['personel_id'] : 0;
 // Bordro listesi (seçilen döneme göre filtreli)
 try {
     $sql = "SELECT b.*, p.ad_soyad,
-                   (b.brut_maas - b.sgk_banka) as nakit,
-                   (b.brut_maas + b.ek_odenek - COALESCE(b.izin_kesintisi, 0) - COALESCE(b.sgk_kesintisi, 0) - COALESCE(b.diger_kesintiler, 0)) as toplam_odenecek
+                   a.banka_avans AS a_banka_avans,
+                   a.nakit_avans AS a_nakit_avans
             FROM bordro b
             LEFT JOIN personel_listesi p ON b.personel_id = p.id
+            LEFT JOIN (
+                SELECT personel_id, SUM(banka_tutari) AS banka_avans, SUM(nakit_tutari) AS nakit_avans
+                FROM avans_takip
+                WHERE ((bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?))
+                GROUP BY personel_id
+            ) a ON a.personel_id = b.personel_id
             WHERE b.ay = ? AND b.yil = ?";
-    $params = [$seciliAy, $seciliYil];
+    $params = [$seciliAy, $seciliYil, $seciliAy, $seciliYil, $seciliAy, $seciliYil];
     
     if ($personel_filtre > 0) {
         $sql .= " AND b.personel_id = ?";
         $params[] = $personel_filtre;
     }
     
-    $sql .= " ORDER BY b.yil DESC, b.ay DESC";
+    $sql .= " ORDER BY p.ad_soyad ASC, b.id ASC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $bordrolar = $stmt->fetchAll();
@@ -45,49 +51,62 @@ try {
     $bordrolar = [];
 }
 
-// Mini özet toplamları (banka/nakit/toplam) – avans ve ek ödenek kanal mantığıyla
-try {
-    // Banka toplamı: banka baz − (kesintiden kalan) − banka avans + ek_odenek_banka
-    $bankaToplamStmt = $pdo->prepare("SELECT SUM(
-        GREATEST(
-            b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0)
-            - COALESCE(b.banka_avans, a.banka_avans, 0)
-        , 0) + COALESCE(b.ek_odenek_banka,0)
-    ) as toplam
-    FROM bordro b
-    LEFT JOIN (
-        SELECT personel_id, SUM(banka_tutari) AS banka_avans, SUM(nakit_tutari) AS nakit_avans
-        FROM avans_takip
-        WHERE ( (bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?) )
-        GROUP BY personel_id
-    ) a ON a.personel_id = b.personel_id
-    WHERE b.ay = ? AND b.yil = ?");
-    $bankaToplamStmt->execute([$seciliAy, $seciliYil, $seciliAy, $seciliYil, $seciliAy, $seciliYil]);
-    $miniBanka = (float)($bankaToplamStmt->fetch()['toplam'] ?? 0);
+// Bordroların hesaplamalarını yap (avans ve kesintiler kanaldan bağımsız olarak düşülür)
+$bordroHesapListesi = [];
+$toplam_brut_maas = 0;
+$toplam_sgk_banka = 0;
+$toplam_nakit = 0;
+$toplam_ek_odenek = 0;
+$toplam_kesintiler = 0;
+$toplam_odenecek = 0;
 
-    // Nakit toplamı: nakit baz − kesinti − nakit avans + ek_odenek_nakit
-    $nakitToplamStmt = $pdo->prepare("SELECT SUM(
-        GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0))
-        - COALESCE(b.nakit_avans, a.nakit_avans, 0), 0) + COALESCE(b.ek_odenek_nakit,0)
-    ) as toplam
-    FROM bordro b
-    LEFT JOIN (
-        SELECT personel_id, SUM(banka_tutari) AS banka_avans, SUM(nakit_tutari) AS nakit_avans
-        FROM avans_takip
-        WHERE ( (bordro_ay = ? AND bordro_yil = ?) OR (bordro_ay IS NULL AND bordro_yil IS NULL AND MONTH(tarih) = ? AND YEAR(tarih) = ?) )
-        GROUP BY personel_id
-    ) a ON a.personel_id = b.personel_id
-    WHERE b.ay = ? AND b.yil = ?");
-    $nakitToplamStmt->execute([$seciliAy, $seciliYil, $seciliAy, $seciliYil, $seciliAy, $seciliYil]);
-    $miniNakit = (float)($nakitToplamStmt->fetch()['toplam'] ?? 0);
+foreach ($bordrolar as $bRow) {
+    $avB = (float)($bRow['banka_avans'] ?? 0);
+    $avN = (float)($bRow['nakit_avans'] ?? 0);
+    if ($avB == 0 && $avN == 0) {
+        $avB = (float)($bRow['a_banka_avans'] ?? 0);
+        $avN = (float)($bRow['a_nakit_avans'] ?? 0);
+    }
 
-    // Genel toplam: Banka + Nakit (kanal bazlı ödemelerin toplamı)
-    $miniToplam = $miniBanka + $miniNakit;
-} catch (PDOException $e) {
-    $miniBanka = 0;
-    $miniNakit = 0;
-    $miniToplam = 0;
+    $ekoB = (float)($bRow['ek_odenek_banka'] ?? 0);
+    $ekoN = (float)($bRow['ek_odenek_nakit'] ?? ($bRow['ek_odenek'] ?? 0));
+    $izinK = (float)($bRow['izin_kesintisi'] ?? 0);
+    $sgkK = (float)($bRow['sgk_kesintisi'] ?? 0);
+    $digerK = (float)($bRow['diger_kesintiler'] ?? 0);
+
+    $calc = calculateBordroPay(
+        $bRow['brut_maas'],
+        $bRow['sgk_banka'] ?? 0,
+        $ekoB,
+        $ekoN,
+        $izinK,
+        $sgkK,
+        $digerK,
+        $avB,
+        $avN
+    );
+
+    $toplam_brut_maas += (float)$bRow['brut_maas'];
+    $toplam_ek_odenek += $calc['toplam_ek_odenek'];
+    $toplam_kesintiler += $calc['toplam_kesinti'];
+    $toplam_sgk_banka += $calc['banka_net'];
+    $toplam_nakit += $calc['nakit_net'];
+    $toplam_odenecek += $calc['toplam_odenecek'];
+
+    $bordroHesapListesi[$bRow['id']] = array_merge($calc, [
+        'avB' => $avB,
+        'avN' => $avN,
+        'ekoB' => $ekoB,
+        'ekoN' => $ekoN,
+        'izinK' => $izinK,
+        'sgkK' => $sgkK,
+        'digerK' => $digerK,
+    ]);
 }
+
+$miniBanka = $toplam_sgk_banka;
+$miniNakit = $toplam_nakit;
+$miniToplam = $toplam_odenecek;
 
 include '../includes/header.php';
 
@@ -173,65 +192,45 @@ if (isset($_GET['error'])) {
                 /* Ek Ödenek ve Kesintiler sütunlarını daha flu göster */
                 #bordro-table td.col-muted, #bordro-table th.col-muted { color: #6c757d; }
                 </style>
-                <table id="bordro-table" class="table table-hover">
+                <table id="bordro-table" class="table table-hover table-sortable">
                     <thead>
                         <tr>
-                            <th>Personel</th>
-                            <th>Ay</th>
-                            <th>Yıl</th>
-                            <th class="money">Brüt Maaş</th>
-                            <th class="money col-muted">Ek Ödenek</th>
-                            <th class="money col-muted">Kesintiler</th>
-                            <th class="money">Banka</th>
-                            <th class="money">Nakit</th>
-                            <th class="money">Toplam Ödenecek</th>
+                            <th class="sortable" data-sort="text">Personel <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable" data-sort="month">Ay <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable" data-sort="number">Yıl <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable money text-end" data-sort="money">Brüt Maaş <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable money col-muted text-end" data-sort="money">Ek Ödenek <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable money col-muted text-end" data-sort="money">Kesintiler <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable money text-end" data-sort="money">Banka <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable money text-end" data-sort="money">Nakit <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable money text-end" data-sort="money">Toplam Ödenecek <i class="bi bi-arrow-down-up small text-muted"></i></th>
                             <th>İşlemler</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php
-                        // Toplamları hesapla
-                        $toplam_brut_maas = 0;
-                        $toplam_sgk_banka = 0;
-                        $toplam_nakit = 0;
-                        $toplam_ek_odenek = 0;
-                        $toplam_kesintiler = 0;
-                        $toplam_odenecek = 0;
-
-                        foreach ($bordrolar as $bordro): 
-                            $toplam_brut_maas += $bordro['brut_maas'];
-                            // Baz değerler
-                            $banka_baz = ($bordro['sgk_banka'] ?? 0);
-                            $nakit_baz = ($bordro['brut_maas'] - $banka_baz);
-                            // Ek ödenekleri (kanal bazında)
-                            $ekoB = ($bordro['ek_odenek_banka'] ?? 0);
-                            $ekoN = ($bordro['ek_odenek_nakit'] ?? 0);
-                            $toplam_ek_odenek += ($ekoB + $ekoN);
-                            // Kesintiler: izin + sgk + diğer + avanslar (banka+nakit)
-                            $izinK = ($bordro['izin_kesintisi'] ?? 0);
-                            $sgkK = ($bordro['sgk_kesintisi'] ?? 0);
-                            $digerK = ($bordro['diger_kesintiler'] ?? 0);
-                            $avB = ($bordro['banka_avans'] ?? 0);
-                            $avN = ($bordro['nakit_avans'] ?? 0);
-                            $kesintiTop = $izinK + $sgkK + $digerK; // Avans hariç
-                            // Kesinti dağıtımı: önce nakitten, kalanı bankadan
-                            $nakit_after_kesinti = max($nakit_baz - $kesintiTop, 0);
-                            $banka_after_kesinti = max($banka_baz - max($kesintiTop - $nakit_baz, 0), 0);
-                            // Avansı kanalından düş
-                            $nakit_net = max($nakit_after_kesinti - $avN, 0);
-                            $banka_net = max($banka_after_kesinti - $avB, 0);
-                            // Ek ödenekleri ilgili kanala ekle
-                            $banka_net += $ekoB;
-                            $nakit_net += $ekoN;
-                            // Alt toplamlar
-                            $toplam_sgk_banka += $banka_net;
-                            $toplam_nakit += $nakit_net;
-                            $toplamKesinti = $izinK + $sgkK + $digerK + $avB + $avN;
-                            $toplam_kesintiler += $toplamKesinti;
-
-                            // Toplam ödenecek (satır): ekranda görünen Banka Net + Nakit Net
-                            $satir_toplam_odenecek = $banka_net + $nakit_net;
-                            $toplam_odenecek += $satir_toplam_odenecek;
+                        <?php foreach ($bordrolar as $bordro): 
+                            $h = $bordroHesapListesi[$bordro['id']] ?? calculateBordroPay(
+                                $bordro['brut_maas'],
+                                $bordro['sgk_banka'] ?? 0,
+                                (float)($bordro['ek_odenek_banka'] ?? 0),
+                                (float)($bordro['ek_odenek_nakit'] ?? ($bordro['ek_odenek'] ?? 0)),
+                                (float)($bordro['izin_kesintisi'] ?? 0),
+                                (float)($bordro['sgk_kesintisi'] ?? 0),
+                                (float)($bordro['diger_kesintiler'] ?? 0),
+                                (float)($bordro['banka_avans'] ?? ($bordro['a_banka_avans'] ?? 0)),
+                                (float)($bordro['nakit_avans'] ?? ($bordro['a_nakit_avans'] ?? 0))
+                            );
+                            $ekoB = (float)($h['ekoB'] ?? ($bordro['ek_odenek_banka'] ?? 0));
+                            $ekoN = (float)($h['ekoN'] ?? ($bordro['ek_odenek_nakit'] ?? ($bordro['ek_odenek'] ?? 0)));
+                            $izinK = (float)($h['izinK'] ?? ($bordro['izin_kesintisi'] ?? 0));
+                            $sgkK = (float)($h['sgkK'] ?? ($bordro['sgk_kesintisi'] ?? 0));
+                            $digerK = (float)($h['digerK'] ?? ($bordro['diger_kesintiler'] ?? 0));
+                            $avB = (float)($h['avB'] ?? ($bordro['banka_avans'] ?? ($bordro['a_banka_avans'] ?? 0)));
+                            $avN = (float)($h['avN'] ?? ($bordro['nakit_avans'] ?? ($bordro['a_nakit_avans'] ?? 0)));
+                            $banka_net = $h['banka_net'];
+                            $nakit_net = $h['nakit_net'];
+                            $toplamKesinti = $h['toplam_kesinti'];
+                            $satir_toplam_odenecek = $h['toplam_odenecek'];
                         ?>
                             <tr>
                                 <td><?php echo escape($bordro['ad_soyad']); ?></td>
@@ -258,7 +257,7 @@ if (isset($_GET['error'])) {
                                 </td>
                                 <td class="money"><?php echo formatMoney($banka_net); ?></td>
                                 <td class="money"><?php echo formatMoney($nakit_net); ?></td>
-                                <td class="money"><?php echo formatMoney($satir_toplam_odenecek); ?></td>
+                                <td class="money fw-semibold"><?php echo formatMoney($satir_toplam_odenecek); ?></td>
                                 <td>
                                     <button class="btn btn-sm btn-info" onclick="gosterBordro(<?php echo $bordro['id']; ?>)">
                                         <i class="bi bi-eye"></i>
@@ -565,6 +564,9 @@ if (isset($_GET['error'])) {
 
                             if (maasSgk && maasSgk !== '0') {
                                 sgkBankaInput.value = formatMoneyInput(maasSgk);
+                            } else if (maas && maas !== '0') {
+                                // Tüm ödemeler bankadan yapıldığı için maas_sgk yoksa tamamı bankadır
+                                sgkBankaInput.value = formatMoneyInput(maas);
                             } else {
                                 sgkBankaInput.value = '0';
                             }

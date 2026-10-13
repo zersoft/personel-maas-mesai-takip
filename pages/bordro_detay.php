@@ -17,24 +17,32 @@ try {
     $b = $stmt->fetch();
     if (!$b) { header('Location: bordro.php?error=' . urlencode('Bordro bulunamadı.')); exit; }
 
-    // Bazlar
+    // Bazlar ve hesaplama
     $brut = (float)($b['brut_maas'] ?? 0);
-    $banka_baz = (float)($b['sgk_banka'] ?? 0);
-    $nakit_baz = $brut - $banka_baz;
     $ekoB = (float)($b['ek_odenek_banka'] ?? 0);
-    $ekoN = (float)($b['ek_odenek_nakit'] ?? 0);
+    $ekoN = (float)($b['ek_odenek_nakit'] ?? ($b['ek_odenek'] ?? 0));
     $izinK = (float)($b['izin_kesintisi'] ?? 0);
     $sgkK = (float)($b['sgk_kesintisi'] ?? 0);
     $digerK = (float)($b['diger_kesintiler'] ?? 0);
     $avB = (float)($b['banka_avans'] ?? 0);
     $avN = (float)($b['nakit_avans'] ?? 0);
 
-    $kesintiTop = $izinK + $sgkK + $digerK; // avans hariç
-    $nakit_after_kesinti = max($nakit_baz - $kesintiTop, 0);
-    $banka_after_kesinti = max($banka_baz - max($kesintiTop - $nakit_baz, 0), 0);
-    $nakit_net = max($nakit_after_kesinti - $avN, 0) + $ekoN;
-    $banka_net = max($banka_after_kesinti - $avB, 0) + $ekoB;
-    $toplam_odenecek = $nakit_net + $banka_net;
+    $calc = calculateBordroPay(
+        $brut,
+        $b['sgk_banka'] ?? 0,
+        $ekoB,
+        $ekoN,
+        $izinK,
+        $sgkK,
+        $digerK,
+        $avB,
+        $avN
+    );
+
+    $banka_net = $calc['banka_net'];
+    $nakit_net = $calc['nakit_net'];
+    $toplam_odenecek = $calc['toplam_odenecek'];
+    $kesintiTop = $calc['toplam_kesinti'];
 } catch (PDOException $e) {
     header('Location: bordro.php?error=' . urlencode('Veri okunamadı.'));
     exit;

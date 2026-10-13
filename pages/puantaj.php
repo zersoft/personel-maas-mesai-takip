@@ -109,17 +109,17 @@ if (isset($_GET['error'])) echo showMessage('Hata: ' . escape($_GET['error']), '
 <div class="card">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover">
+            <table class="table table-hover table-sortable">
                 <thead>
                     <tr>
-                        <th>Personel</th>
-                        <th class="text-end">Çalışılan Gün</th>
-                        <th class="text-end">Çalışılan Saat</th>
-                        <th class="text-end">İzin</th>
-                        <th class="text-end">Rapor</th>
-                        <th class="text-end">Devamsızlık</th>
-                        <th class="text-end">Hafta Tatili</th>
-                        <th class="text-end">Resmi Tatil</th>
+                        <th class="sortable" data-sort="text">Personel <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                        <th class="text-end sortable" data-sort="number">Çalışılan Gün <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                        <th class="text-end sortable" data-sort="number">Çalışılan Saat <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                        <th class="text-end sortable" data-sort="number">İzin <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                        <th class="text-end sortable" data-sort="number">Rapor <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                        <th class="text-end sortable" data-sort="number">Devamsızlık <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                        <th class="text-end sortable" data-sort="number">Hafta Tatili <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                        <th class="text-end sortable" data-sort="number">Resmi Tatil <i class="bi bi-arrow-down-up small text-muted"></i></th>
                         <th>İşlemler</th>
                     </tr>
                 </thead>

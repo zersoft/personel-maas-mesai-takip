@@ -84,6 +84,82 @@ function parseMoney($value) {
 }
 
 /**
+ * Bordro ödeme ve kesinti dağılımını hesapla (Banka / Nakit / Toplam)
+ * Avans ve kesintiler kanallardan bağımsız olarak tüm kazançtan düşülür;
+ * Nakit avans banka ödemesinden de kesilebilir, hiçbir kesinti kaybolmaz.
+ */
+function calculateBordroPay($brutMaas, $sgkBanka, $ekBanka = 0, $ekNakit = 0, $izinK = 0, $sgkK = 0, $digerK = 0, $avBanka = 0, $avNakit = 0) {
+    $brutMaas = (float)$brutMaas;
+    $sgkBanka = (float)$sgkBanka;
+    $ekBanka = (float)$ekBanka;
+    $ekNakit = (float)$ekNakit;
+    $izinK = (float)$izinK;
+    $sgkK = (float)$sgkK;
+    $digerK = (float)$digerK;
+    $avBanka = (float)$avBanka;
+    $avNakit = (float)$avNakit;
+
+    // Şirkette tüm maaşlar bankadan ödendiği için, sgk_banka belirtilmemişse veya 0 ise
+    // maaşın tamamı banka baz kabul edilir.
+    if ($sgkBanka <= 0) {
+        $bankaBaz = $brutMaas;
+        $nakitBaz = 0.0;
+    } else {
+        $bankaBaz = min($sgkBanka, $brutMaas);
+        $nakitBaz = max($brutMaas - $sgkBanka, 0.0);
+    }
+
+    $bankaPay = $bankaBaz + $ekBanka;
+    $nakitPay = $nakitBaz + $ekNakit;
+
+    // 1) Nakit avansı önce nakit payından düş; yetmezse kalanı banka ödemesinden kes
+    if ($avNakit > 0) {
+        if ($nakitPay >= $avNakit) {
+            $nakitPay -= $avNakit;
+        } else {
+            $kalanAvNakit = $avNakit - $nakitPay;
+            $nakitPay = 0.0;
+            $bankaPay = max($bankaPay - $kalanAvNakit, 0.0);
+        }
+    }
+
+    // 2) Banka avansını önce banka payından düş; yetmezse kalanı nakitten kes
+    if ($avBanka > 0) {
+        if ($bankaPay >= $avBanka) {
+            $bankaPay -= $avBanka;
+        } else {
+            $kalanAvBanka = $avBanka - $bankaPay;
+            $bankaPay = 0.0;
+            $nakitPay = max($nakitPay - $kalanAvBanka, 0.0);
+        }
+    }
+
+    // 3) Diğer kesintiler (izin, sgk, diğer): önce nakitten, yetmezse bankadan düş
+    $digerKesintiTop = $izinK + $sgkK + $digerK;
+    if ($digerKesintiTop > 0) {
+        if ($nakitPay >= $digerKesintiTop) {
+            $nakitPay -= $digerKesintiTop;
+        } else {
+            $kalanKesinti = $digerKesintiTop - $nakitPay;
+            $nakitPay = 0.0;
+            $bankaPay = max($bankaPay - $kalanKesinti, 0.0);
+        }
+    }
+
+    $toplamOdenecek = $bankaPay + $nakitPay;
+    $toplamKesinti = $izinK + $sgkK + $digerK + $avBanka + $avNakit;
+    $toplamEkOdenek = $ekBanka + $ekNakit;
+
+    return [
+        'banka_net' => $bankaPay,
+        'nakit_net' => $nakitPay,
+        'toplam_odenecek' => $toplamOdenecek,
+        'toplam_kesinti' => $toplamKesinti,
+        'toplam_ek_odenek' => $toplamEkOdenek,
+    ];
+}
+
+/**
  * Mesaj gösterimi
  */
 function showMessage($message, $type = 'success') {

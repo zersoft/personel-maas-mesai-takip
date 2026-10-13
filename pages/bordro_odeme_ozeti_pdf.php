@@ -30,17 +30,11 @@ if ($ay < 1 || $ay > 12) $ay = (int)date('n');
 if ($yil < 2000 || $yil > 2100) $yil = (int)date('Y');
 
 try {
-    $stmt = $pdo->prepare("SELECT p.ad_soyad,
-        COALESCE(b.brut_maas, 0) AS brut_maas,
+    $stmt = $pdo->prepare("SELECT b.*, p.ad_soyad,
         COALESCE(b.aciklama, '') AS aciklama,
         COALESCE(b.kesinti_aciklama, '') AS kesinti_aciklama,
-        (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) AS kesinti_toplam,
-        (COALESCE(b.banka_avans, a.banka_avans, 0) + COALESCE(b.nakit_avans, a.nakit_avans, 0)) AS avans_toplam,
-        (COALESCE(b.ek_odenek_banka,0) + COALESCE(b.ek_odenek_nakit,0)) AS ilave_odeme_toplam,
-        (GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) - COALESCE(b.nakit_avans, a.nakit_avans, 0) + COALESCE(b.ek_odenek_nakit,0)) AS nakit_pay,
-        (GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) - COALESCE(b.banka_avans, a.banka_avans, 0) + COALESCE(b.ek_odenek_banka,0)) AS banka_pay,
-        GREATEST((GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) - COALESCE(b.nakit_avans, a.nakit_avans, 0) + COALESCE(b.ek_odenek_nakit,0))
-               + (GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) - COALESCE(b.banka_avans, a.banka_avans, 0) + COALESCE(b.ek_odenek_banka,0)), 0) AS toplam_odenecek
+        a.banka_avans AS a_banka_avans,
+        a.nakit_avans AS a_nakit_avans
         FROM bordro b
         LEFT JOIN personel_listesi p ON b.personel_id = p.id
         LEFT JOIN (
@@ -50,9 +44,45 @@ try {
             GROUP BY personel_id
         ) a ON a.personel_id = b.personel_id
         WHERE b.ay = ? AND b.yil = ?
-        ORDER BY p.ad_soyad");
+        ORDER BY p.ad_soyad ASC");
     $stmt->execute([$ay, $yil, $ay, $yil, $ay, $yil]);
-    $rows = $stmt->fetchAll();
+    $rawRows = $stmt->fetchAll();
+
+    $rows = [];
+    foreach ($rawRows as $bRow) {
+        $avB = (float)($bRow['banka_avans'] ?? 0);
+        $avN = (float)($bRow['nakit_avans'] ?? 0);
+        if ($avB == 0 && $avN == 0) {
+            $avB = (float)($bRow['a_banka_avans'] ?? 0);
+            $avN = (float)($bRow['a_nakit_avans'] ?? 0);
+        }
+
+        $ekoB = (float)($bRow['ek_odenek_banka'] ?? 0);
+        $ekoN = (float)($bRow['ek_odenek_nakit'] ?? ($bRow['ek_odenek'] ?? 0));
+        $izinK = (float)($bRow['izin_kesintisi'] ?? 0);
+        $sgkK = (float)($bRow['sgk_kesintisi'] ?? 0);
+        $digerK = (float)($bRow['diger_kesintiler'] ?? 0);
+
+        $calc = calculateBordroPay(
+            $bRow['brut_maas'],
+            $bRow['sgk_banka'] ?? 0,
+            $ekoB,
+            $ekoN,
+            $izinK,
+            $sgkK,
+            $digerK,
+            $avB,
+            $avN
+        );
+
+        $bRow['kesinti_toplam'] = $izinK + $sgkK + $digerK;
+        $bRow['avans_toplam'] = $avB + $avN;
+        $bRow['ilave_odeme_toplam'] = $calc['toplam_ek_odenek'];
+        $bRow['banka_pay'] = $calc['banka_net'];
+        $bRow['nakit_pay'] = $calc['nakit_net'];
+        $bRow['toplam_odenecek'] = $calc['toplam_odenecek'];
+        $rows[] = $bRow;
+    }
 } catch (PDOException $e) {
     if (ob_get_level()) ob_end_clean();
     header('Content-Type: text/html; charset=utf-8');

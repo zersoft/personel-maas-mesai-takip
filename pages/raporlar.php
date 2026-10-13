@@ -48,11 +48,9 @@ $hasBankaAvansCol = columnExists($pdo, 'bordro', 'banka_avans');
 $hasNakitAvansCol = columnExists($pdo, 'bordro', 'nakit_avans');
 try {
     // 1) Ödeme özeti ile aynı çekirdek sorgu: satır bazlı banka/nakit/toplam
-    $coreStmt = $pdo->prepare("SELECT p.ad_soyad,
-        (GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) - COALESCE(b.nakit_avans, a.nakit_avans, 0) + COALESCE(b.ek_odenek_nakit,0)) AS nakit_pay,
-        (GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) - COALESCE(b.banka_avans, a.banka_avans, 0) + COALESCE(b.ek_odenek_banka,0)) AS banka_pay,
-        GREATEST((GREATEST((b.brut_maas - b.sgk_banka) - (COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)), 0) - COALESCE(b.nakit_avans, a.nakit_avans, 0) + COALESCE(b.ek_odenek_nakit,0))
-               + (GREATEST(b.sgk_banka - GREATEST((COALESCE(b.izin_kesintisi,0)+COALESCE(b.sgk_kesintisi,0)+COALESCE(b.diger_kesintiler,0)) - (b.brut_maas - b.sgk_banka), 0), 0) - COALESCE(b.banka_avans, a.banka_avans, 0) + COALESCE(b.ek_odenek_banka,0)), 0) AS toplam_odenecek
+    $coreStmt = $pdo->prepare("SELECT b.*, p.ad_soyad,
+        a.banka_avans AS a_banka_avans,
+        a.nakit_avans AS a_nakit_avans
         FROM bordro b
         LEFT JOIN personel_listesi p ON b.personel_id = p.id
         LEFT JOIN (
@@ -62,9 +60,37 @@ try {
             GROUP BY personel_id
         ) a ON a.personel_id = b.personel_id
         WHERE b.ay = ? AND b.yil = ?
-        ORDER BY p.ad_soyad");
+        ORDER BY p.ad_soyad ASC");
     $coreStmt->execute([$ay, $yil, $ay, $yil, $ay, $yil]);
-    $coreRows = $coreStmt->fetchAll();
+    $rawCoreRows = $coreStmt->fetchAll();
+
+    $coreRows = [];
+    foreach ($rawCoreRows as $bRow) {
+        $avB = (float)($bRow['banka_avans'] ?? 0);
+        $avN = (float)($bRow['nakit_avans'] ?? 0);
+        if ($avB == 0 && $avN == 0) {
+            $avB = (float)($bRow['a_banka_avans'] ?? 0);
+            $avN = (float)($bRow['a_nakit_avans'] ?? 0);
+        }
+
+        $calc = calculateBordroPay(
+            $bRow['brut_maas'],
+            $bRow['sgk_banka'] ?? 0,
+            (float)($bRow['ek_odenek_banka'] ?? 0),
+            (float)($bRow['ek_odenek_nakit'] ?? ($bRow['ek_odenek'] ?? 0)),
+            (float)($bRow['izin_kesintisi'] ?? 0),
+            (float)($bRow['sgk_kesintisi'] ?? 0),
+            (float)($bRow['diger_kesintiler'] ?? 0),
+            $avB,
+            $avN
+        );
+
+        $bRow['banka_pay'] = $calc['banka_net'];
+        $bRow['nakit_pay'] = $calc['nakit_net'];
+        $bRow['toplam_odenecek'] = $calc['toplam_odenecek'];
+        $coreRows[] = $bRow;
+    }
+
     if (!empty($coreRows)) {
         // Satırlardan kart toplamlarını türet
         $bankaToplamSonuc = array_sum(array_map(function($r){ return (float)$r['banka_pay']; }, $coreRows));

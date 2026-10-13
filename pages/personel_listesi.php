@@ -136,18 +136,18 @@ if (isset($_GET['error'])) {
                 #personel-table .col-name { width: 26%; }
                 #personel-table .col-actions { width: 110px; white-space: nowrap; }
                 </style>
-                <table id="personel-table" class="table table-hover table-sm">
+                <table id="personel-table" class="table table-hover table-sm table-sortable">
                     <thead>
                         <tr>
-                            <th>ID</th>
-                            <th class="col-name">Ad Soyad</th>
-                            <th>TC No</th>
-                            <th>Pozisyon</th>
-                            <th class="money">Maaş</th>
-                            <th class="money">Maaş SGK</th>
-                            <th>İşe Giriş</th>
-                            <th class="money">Mesai Saat Ücreti</th>
-                            <th>Durum</th>
+                            <th class="sortable" data-sort="number" style="width: 60px;">ID <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="col-name sortable" data-sort="text">Ad Soyad <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable" data-sort="text">TC No <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable" data-sort="text">Pozisyon <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="money sortable text-end" data-sort="money">Maaş <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="money sortable text-end" data-sort="money">Maaş SGK <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable" data-sort="date">İşe Giriş <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="money sortable text-end" data-sort="money">Mesai Saat Ücreti <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable" data-sort="text">Durum <i class="bi bi-arrow-down-up small text-muted"></i></th>
                             <th class="col-actions">İşlemler</th>
                         </tr>
                     </thead>

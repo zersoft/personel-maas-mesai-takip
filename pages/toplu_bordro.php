@@ -190,9 +190,12 @@ if (isset($_GET['error'])) {
                                         <input type="hidden" name="brut_maas_raw[<?php echo $personelId; ?>]" id="brut_maas_raw_<?php echo $personelId; ?>" value="">
                                     </td>
                                     <td>
+                                        <?php 
+                                        $defSgkBanka = ((float)$personel['maas_sgk'] > 0) ? (float)$personel['maas_sgk'] : (float)$personel['maas'];
+                                        ?>
                                         <input type="text" class="form-control form-control-sm money-field" data-no-auto-format="true" pattern="[0-9.,]+" 
                                                name="sgk_banka[<?php echo $personelId; ?>]" 
-                                               value="<?php echo number_format((float)$personel['maas_sgk'], 2, ',', '.'); ?>" 
+                                               value="<?php echo number_format($defSgkBanka, 2, ',', '.'); ?>" 
                                                data-personel-id="<?php echo $personelId; ?>" 
                                                data-required="true">
                                         <input type="hidden" name="sgk_banka_raw[<?php echo $personelId; ?>]" id="sgk_banka_raw_<?php echo $personelId; ?>" value="">

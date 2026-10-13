@@ -113,9 +113,21 @@ th.sortable {
     cursor: pointer;
     user-select: none;
     transition: background-color 0.15s ease-in-out;
+    white-space: nowrap;
 }
 th.sortable:hover {
-    background-color: rgba(0, 0, 0, 0.05) !important;
+    background-color: rgba(13, 110, 253, 0.08) !important;
+}
+th.sortable .sort-icon {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 5px;
+    font-size: 0.85em;
+    vertical-align: middle;
+}
+th.sortable.sorted-asc,
+th.sortable.sorted-desc {
+    color: #0d6efd !important;
 }
 
 /* Genel Yazdırma (Print) Stilleri */

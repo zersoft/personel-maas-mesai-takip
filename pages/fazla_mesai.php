@@ -327,14 +327,14 @@ if (isset($_GET['error'])) {
                     </div>
                 <?php else: ?>
                     <div class="table-responsive">
-                        <table class="table table-hover">
+                        <table class="table table-hover table-sortable">
                             <thead>
                                 <tr>
-                                    <th>Personel</th>
-                                    <th>Tarih</th>
-                                    <th>Süre (Saat)</th>
-                                    <th class="money">Saat Ücreti</th>
-                                    <th class="money">Tutar</th>
+                                    <th class="sortable" data-sort="text">Personel <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                                    <th class="sortable" data-sort="date">Tarih <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                                    <th class="sortable" data-sort="number">Süre (Saat) <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                                    <th class="money sortable text-end" data-sort="money">Saat Ücreti <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                                    <th class="money sortable text-end" data-sort="money">Tutar <i class="bi bi-arrow-down-up small text-muted"></i></th>
                                     <th>Açıklama</th>
                                     <th>İşlemler</th>
                                 </tr>
@@ -406,13 +406,13 @@ if (isset($_GET['error'])) {
                     </div>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-hover table-sm table-bordered">
+                    <table class="table table-hover table-sm table-bordered table-sortable">
                         <thead class="table-light">
                             <tr>
-                                <th>Personel</th>
-                                <th class="text-end">Toplam FM (₺)</th>
-                                <th class="text-end">Toplam Ödeme (₺)</th>
-                                <th class="text-end">Kalan Alacak (₺)</th>
+                                <th class="sortable" data-sort="text">Personel <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                                <th class="text-end sortable" data-sort="money">Toplam FM (₺) <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                                <th class="text-end sortable" data-sort="money">Toplam Ödeme (₺) <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                                <th class="text-end sortable" data-sort="money">Kalan Alacak (₺) <i class="bi bi-arrow-down-up small text-muted"></i></th>
                             </tr>
                         </thead>
                         <tbody>
