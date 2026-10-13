@@ -38,18 +38,21 @@ function formatMoney($amount) {
  * Para değerini parse et (TR/EN format desteği)
  */
 function parseMoney($value) {
-    if (empty($value) || $value === '') return 0;
+    if (empty($value) && $value !== '0' && $value !== 0) return 0;
     
-    // Zaten sayısal ise direkt dön
-    if (is_numeric($value)) {
+    // Sayısal tip ise (float veya int) direkt dön
+    if (is_int($value) || is_float($value)) {
         return (float)$value;
     }
     
     // String ise parse et
-    $value = trim($value);
+    $value = trim((string)$value);
+    if ($value === '' || $value === '0') return 0;
+    
+    // TL simgesi ve boşlukları temizle
+    $value = str_replace(['₺', 'TL', ' '], '', $value);
     
     // Binlik ayırıcıları kaldır (nokta veya virgül)
-    // Önce binlik ayırıcıyı tespit et
     $hasDot = strpos($value, '.') !== false;
     $hasComma = strpos($value, ',') !== false;
     
@@ -67,17 +70,12 @@ function parseMoney($value) {
             $value = str_replace(',', '.', $value);
         }
     } elseif ($hasComma) {
-        // Sadece virgül var - muhtemelen Türk formatı (ondalık)
+        // Sadece virgül var - Türk formatı (ondalık: 20000,00 veya 20,50)
         $value = str_replace(',', '.', $value);
     } elseif ($hasDot) {
-        // Sadece nokta var - muhtemelen İngiliz formatı (ondalık)
-        // Binlik ayırıcı olabilir, kontrol et
         $parts = explode('.', $value);
-        if (count($parts) === 2 && strlen($parts[1]) <= 2) {
-            // Ondalık kısım 2 haneden az/equal - muhtemelen ondalık
-            // Olduğu gibi bırak
-        } else {
-            // Muhtemelen binlik ayırıcı - kaldır
+        // Birden fazla nokta varsa (1.000.000) veya son parça 3 basamaklı ise (20.000) -> Türkçe binlik ayracıdır
+        if (count($parts) > 2 || (count($parts) === 2 && strlen($parts[1]) === 3)) {
             $value = str_replace('.', '', $value);
         }
     }

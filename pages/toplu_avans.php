@@ -144,7 +144,7 @@ if (isset($_GET['error'])) {
             <div class="col-md-3">
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-light text-muted">Banka</span>
-                    <input type="text" id="topluBanka" class="form-control money-field text-end" placeholder="0,00" value="">
+                    <input type="text" id="topluBanka" class="form-control money-field text-end" placeholder="0,00" value="" data-no-auto-format="true">
                     <button type="button" id="btnUygulaBanka" class="btn btn-outline-primary" title="Banka tutarını seçilen satırlara uygula">
                         Uygula
                     </button>
@@ -154,7 +154,7 @@ if (isset($_GET['error'])) {
             <div class="col-md-3">
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-light text-muted">Nakit</span>
-                    <input type="text" id="topluNakit" class="form-control money-field text-end" placeholder="0,00" value="">
+                    <input type="text" id="topluNakit" class="form-control money-field text-end" placeholder="0,00" value="" data-no-auto-format="true">
                     <button type="button" id="btnUygulaNakit" class="btn btn-outline-primary" title="Nakit tutarını seçilen satırlara uygula">
                         Uygula
                     </button>
@@ -298,13 +298,13 @@ if (isset($_GET['error'])) {
                                             </td>
                                             <td class="text-end">
                                                 <div class="input-group input-group-sm">
-                                                    <input type="text" class="form-control form-control-sm text-end money-field row-banka" name="items[<?php echo $rowIndex; ?>][banka_tutari]" value="<?php echo number_format($bankaTutari, 2, ',', '.'); ?>">
+                                                    <input type="text" class="form-control form-control-sm text-end money-field row-banka" name="items[<?php echo $rowIndex; ?>][banka_tutari]" value="<?php echo number_format($bankaTutari, 2, ',', '.'); ?>" data-no-auto-format="true">
                                                     <span class="input-group-text">₺</span>
                                                 </div>
                                             </td>
                                             <td class="text-end">
                                                 <div class="input-group input-group-sm">
-                                                    <input type="text" class="form-control form-control-sm text-end money-field row-nakit" name="items[<?php echo $rowIndex; ?>][nakit_tutari]" value="<?php echo number_format($nakitTutari, 2, ',', '.'); ?>">
+                                                    <input type="text" class="form-control form-control-sm text-end money-field row-nakit" name="items[<?php echo $rowIndex; ?>][nakit_tutari]" value="<?php echo number_format($nakitTutari, 2, ',', '.'); ?>" data-no-auto-format="true">
                                                     <span class="input-group-text">₺</span>
                                                 </div>
                                             </td>
@@ -346,13 +346,13 @@ if (isset($_GET['error'])) {
                                         </td>
                                         <td class="text-end">
                                             <div class="input-group input-group-sm">
-                                                <input type="text" class="form-control form-control-sm text-end money-field row-banka" name="items[<?php echo $rowIndex; ?>][banka_tutari]" value="0,00">
+                                                <input type="text" class="form-control form-control-sm text-end money-field row-banka" name="items[<?php echo $rowIndex; ?>][banka_tutari]" value="0,00" data-no-auto-format="true">
                                                 <span class="input-group-text">₺</span>
                                             </div>
                                         </td>
                                         <td class="text-end">
                                             <div class="input-group input-group-sm">
-                                                <input type="text" class="form-control form-control-sm text-end money-field row-nakit" name="items[<?php echo $rowIndex; ?>][nakit_tutari]" value="0,00">
+                                                <input type="text" class="form-control form-control-sm text-end money-field row-nakit" name="items[<?php echo $rowIndex; ?>][nakit_tutari]" value="0,00" data-no-auto-format="true">
                                                 <span class="input-group-text">₺</span>
                                             </div>
                                         </td>
@@ -400,18 +400,25 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Para ayrıştırma yardımcısı (JS tarafı)
     function parseMoneyLocal(val) {
-        if (!val) return 0;
+        if (!val && val !== 0) return 0;
         let s = val.toString().trim().replace('₺', '').trim();
-        if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
+        const hasComma = s.indexOf(',') !== -1;
+        const hasDot = s.indexOf('.') !== -1;
+        if (hasComma && hasDot) {
             s = s.replace(/\./g, '').replace(',', '.');
-        } else if (s.indexOf(',') !== -1) {
+        } else if (hasComma) {
             s = s.replace(/\./g, '').replace(',', '.');
-        } else {
-            // Sadece nokta veya düz sayı
+        } else if (hasDot) {
             const parts = s.split('.');
             if (parts.length > 1) {
                 const last = parts.pop();
-                s = (last.length <= 2) ? (parts.join('') + '.' + last) : (parts.join('') + last);
+                if (last.length === 3) {
+                    s = parts.join('') + last;
+                } else if (last.length <= 2) {
+                    s = parts.join('') + '.' + last;
+                } else {
+                    s = parts.join('') + last;
+                }
             }
         }
         s = s.replace(/[^0-9.]/g, '');
@@ -490,6 +497,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         [bankaInp, nakitInp].forEach(inp => {
             if (!inp) return;
+            inp.addEventListener('focus', function() {
+                const num = parseMoneyLocal(this.value);
+                if (num === 0) {
+                    this.value = '';
+                } else {
+                    this.select();
+                }
+            });
             inp.addEventListener('input', function() {
                 const rowTot = updateRowTotal(tr);
                 // Kullanıcı tutar girdiğinde otomatik olarak seçili yap
@@ -499,6 +514,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 recalculateSummary();
             });
             inp.addEventListener('blur', function() {
+                const num = parseMoneyLocal(this.value);
+                this.value = num > 0 ? num.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00';
                 updateRowTotal(tr);
                 recalculateSummary();
             });
@@ -606,6 +623,30 @@ document.addEventListener('DOMContentLoaded', function() {
             if (count === 0) {
                 alert('Tarih uygulamak için lütfen en az bir personel satırı seçin.');
             }
+        });
+    }
+
+    const topluBankaInp = document.getElementById('topluBanka');
+    if (topluBankaInp) {
+        topluBankaInp.addEventListener('focus', function() {
+            if (parseMoneyLocal(this.value) === 0) this.value = '';
+            else this.select();
+        });
+        topluBankaInp.addEventListener('blur', function() {
+            const num = parseMoneyLocal(this.value);
+            if (num > 0) this.value = num.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        });
+    }
+
+    const topluNakitInp = document.getElementById('topluNakit');
+    if (topluNakitInp) {
+        topluNakitInp.addEventListener('focus', function() {
+            if (parseMoneyLocal(this.value) === 0) this.value = '';
+            else this.select();
+        });
+        topluNakitInp.addEventListener('blur', function() {
+            const num = parseMoneyLocal(this.value);
+            if (num > 0) this.value = num.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         });
     }
 
@@ -732,13 +773,13 @@ document.addEventListener('DOMContentLoaded', function() {
             </td>
             <td class="text-end">
                 <div class="input-group input-group-sm">
-                    <input type="text" class="form-control form-control-sm text-end money-field row-banka" name="items[${nextRowIndex}][banka_tutari]" value="0,00">
+                    <input type="text" class="form-control form-control-sm text-end money-field row-banka" name="items[${nextRowIndex}][banka_tutari]" value="0,00" data-no-auto-format="true">
                     <span class="input-group-text">₺</span>
                 </div>
             </td>
             <td class="text-end">
                 <div class="input-group input-group-sm">
-                    <input type="text" class="form-control form-control-sm text-end money-field row-nakit" name="items[${nextRowIndex}][nakit_tutari]" value="0,00">
+                    <input type="text" class="form-control form-control-sm text-end money-field row-nakit" name="items[${nextRowIndex}][nakit_tutari]" value="0,00" data-no-auto-format="true">
                     <span class="input-group-text">₺</span>
                 </div>
             </td>
@@ -761,7 +802,7 @@ document.addEventListener('DOMContentLoaded', function() {
         recalculateSummary();
     });
 
-    // Form submit doğrulaması
+    // Form submit doğrulaması ve temiz sayıya dönüştürme
     const form = document.getElementById('topluAvansForm');
     if (form) {
         form.addEventListener('submit', function(e) {
@@ -770,6 +811,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const c = tr.querySelector('.row-check');
                 if (c && c.checked) {
                     checkedCount++;
+                    const bankaInp = tr.querySelector('.row-banka');
+                    const nakitInp = tr.querySelector('.row-nakit');
+                    if (bankaInp) {
+                        bankaInp.value = parseMoneyLocal(bankaInp.value).toFixed(2);
+                    }
+                    if (nakitInp) {
+                        nakitInp.value = parseMoneyLocal(nakitInp.value).toFixed(2);
+                    }
                 }
             });
 

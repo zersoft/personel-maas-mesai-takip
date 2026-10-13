@@ -165,17 +165,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Para alanları için binlik ayracı formatlaması
     function formatMoneyInput(value) {
-        if (!value || value === '0' || value === '') return '0';
-        // Ondalık kısmı ayır (virgül veya nokta)
-        let parts = value.toString().split(/[,.]/);
-        let integerPart = parts[0].replace(/\D/g, ''); // Sadece rakamları al
-        let decimalPart = parts[1] || '';
+        if (!value || value === '0' || value === '') return '0,00';
+        const raw = parseMoneyInput(value);
+        if (!raw || raw === '0') return '0,00';
         
-        // Binlik ayracı ekle
+        let parts = raw.split('.');
+        let integerPart = parts[0].replace(/\D/g, '') || '0';
+        let decimalPart = parts[1] || '00';
+        if (decimalPart.length === 1) decimalPart += '0';
+        if (decimalPart.length > 2) decimalPart = decimalPart.substring(0, 2);
+        
         const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-        
-        // Ondalık kısmı varsa virgül ile ekle
-        return decimalPart ? formattedInteger + ',' + decimalPart : formattedInteger;
+        return formattedInteger + ',' + decimalPart;
     }
     
     function parseMoneyInput(value) {
