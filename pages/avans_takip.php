@@ -24,7 +24,7 @@ try {
         $params[] = $personel_filtre;
     }
     
-    $sql .= " ORDER BY a.tarih DESC";
+    $sql .= " ORDER BY p.ad_soyad ASC, a.tarih DESC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $avanslar = $stmt->fetchAll();
@@ -87,15 +87,15 @@ if (isset($_GET['error'])) {
     <div class="card">
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover table-sortable">
                     <thead>
                         <tr>
-                            <th>Personel</th>
-                            <th>Tarih</th>
-                            <th>Bordro Dönemi</th>
-                            <th class="money">Avans (Banka)</th>
-                            <th class="money">Avans (Nakit)</th>
-                            <th class="money">Toplam</th>
+                            <th class="sortable" data-sort="text" style="cursor: pointer; user-select: none;">Personel <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable" data-sort="date" style="cursor: pointer; user-select: none;">Tarih <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable" data-sort="text" style="cursor: pointer; user-select: none;">Bordro Dönemi <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable money text-end" data-sort="money" style="cursor: pointer; user-select: none;">Avans (Banka) <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable money text-end" data-sort="money" style="cursor: pointer; user-select: none;">Avans (Nakit) <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable money text-end" data-sort="money" style="cursor: pointer; user-select: none;">Toplam <i class="bi bi-arrow-down-up small text-muted"></i></th>
                             <th>Açıklama</th>
                             <th>İşlemler</th>
                         </tr>

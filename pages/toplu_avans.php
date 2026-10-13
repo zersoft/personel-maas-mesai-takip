@@ -232,19 +232,19 @@ if (isset($_GET['error'])) {
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-sm align-middle mb-0" id="avansTablosu">
+                <table class="table table-hover table-sm align-middle mb-0 table-sortable" id="avansTablosu">
                     <thead class="table-light">
                         <tr>
                             <th class="text-center" style="width: 45px;">
                                 <input type="checkbox" id="hepsiniSecCheckbox" class="form-check-input" title="Tümünü Seç / Kaldır">
                             </th>
-                            <th style="min-width: 180px;">Personel</th>
-                            <th style="width: 100px;">Durum</th>
-                            <th style="width: 140px;">Tarih</th>
-                            <th style="width: 150px;" class="text-end">Avans (Banka)</th>
-                            <th style="width: 150px;" class="text-end">Avans (Nakit)</th>
-                            <th style="width: 140px;" class="text-end">Toplam</th>
-                            <th style="min-width: 180px;">Açıklama</th>
+                            <th class="sortable" data-sort="text" style="min-width: 180px; cursor: pointer; user-select: none;">Personel <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable" data-sort="text" style="width: 100px; cursor: pointer; user-select: none;">Durum <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable" data-sort="date" style="width: 140px; cursor: pointer; user-select: none;">Tarih <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable text-end" data-sort="money" style="width: 150px; cursor: pointer; user-select: none;">Avans (Banka) <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable text-end" data-sort="money" style="width: 150px; cursor: pointer; user-select: none;">Avans (Nakit) <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th class="sortable text-end" data-sort="money" style="width: 140px; cursor: pointer; user-select: none;">Toplam <i class="bi bi-arrow-down-up small text-muted"></i></th>
+                            <th>Açıklama</th>
                             <th style="width: 70px;" class="text-center">İşlem</th>
                         </tr>
                     </thead>

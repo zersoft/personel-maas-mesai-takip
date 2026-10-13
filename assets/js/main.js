@@ -272,5 +272,87 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+
+    // Tablo sütun başlığına tıklayarak sıralama motoru
+    function initSortableTables() {
+        document.querySelectorAll('table.table-sortable').forEach(function(table) {
+            const thead = table.querySelector('thead');
+            const tbody = table.querySelector('tbody');
+            if (!thead || !tbody) return;
+
+            const headers = thead.querySelectorAll('th.sortable');
+            headers.forEach(function(th) {
+                const cellIndex = th.cellIndex;
+                const sortType = th.getAttribute('data-sort') || 'text';
+                let currentDir = null; // 'asc' veya 'desc'
+
+                th.addEventListener('click', function(e) {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+
+                    currentDir = (currentDir === 'asc') ? 'desc' : 'asc';
+
+                    // Tüm başlıklardaki simgeleri sıfırla
+                    headers.forEach(h => {
+                        const icon = h.querySelector('i');
+                        if (icon) {
+                            icon.className = 'bi bi-arrow-down-up small text-muted';
+                        }
+                    });
+
+                    // Aktif başlık simgesi
+                    const activeIcon = th.querySelector('i');
+                    if (activeIcon) {
+                        activeIcon.className = currentDir === 'asc' 
+                            ? (sortType === 'money' || sortType === 'number' ? 'bi bi-sort-numeric-down text-primary' : 'bi bi-sort-alpha-down text-primary')
+                            : (sortType === 'money' || sortType === 'number' ? 'bi bi-sort-numeric-up-alt text-primary' : 'bi bi-sort-alpha-up-alt text-primary');
+                    }
+
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    if (rows.length <= 1) return;
+
+                    const getVal = function(cell) {
+                        if (!cell) return '';
+                        const input = cell.querySelector('input:not([type="hidden"]), select');
+                        if (input) return input.value.trim();
+                        return cell.textContent.trim();
+                    };
+
+                    rows.sort(function(rowA, rowB) {
+                        const cellA = rowA.cells[cellIndex];
+                        const cellB = rowB.cells[cellIndex];
+                        const valA = getVal(cellA);
+                        const valB = getVal(cellB);
+
+                        if (sortType === 'money' || sortType === 'number') {
+                            const numA = typeof parseMoneyInput === 'function' ? parseFloat(parseMoneyInput(valA)) : (parseFloat(valA.replace(/[^0-9.-]/g, '')) || 0);
+                            const numB = typeof parseMoneyInput === 'function' ? parseFloat(parseMoneyInput(valB)) : (parseFloat(valB.replace(/[^0-9.-]/g, '')) || 0);
+                            return currentDir === 'asc' ? (numA - numB) : (numB - numA);
+                        } else if (sortType === 'date') {
+                            const parseDateVal = function(s) {
+                                if (!s) return 0;
+                                if (s.indexOf('-') !== -1) {
+                                    return new Date(s).getTime() || 0;
+                                }
+                                const p = s.split('.');
+                                if (p.length === 3) {
+                                    return new Date(p[2], p[1] - 1, p[0]).getTime() || 0;
+                                }
+                                return 0;
+                            };
+                            return currentDir === 'asc' ? (parseDateVal(valA) - parseDateVal(valB)) : (parseDateVal(valB) - parseDateVal(valA));
+                        } else {
+                            return currentDir === 'asc' 
+                                ? valA.localeCompare(valB, 'tr', { sensitivity: 'base' })
+                                : valB.localeCompare(valA, 'tr', { sensitivity: 'base' });
+                        }
+                    });
+
+                    rows.forEach(r => tbody.appendChild(r));
+                });
+            });
+        });
+    }
+
+    initSortableTables();
 });
 

@@ -108,6 +108,16 @@ span.money {
     cursor: not-allowed;
 }
 
+/* Sıralanabilir Tablo Başlıkları */
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease-in-out;
+}
+th.sortable:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
 /* Genel Yazdırma (Print) Stilleri */
 @media print {
     nav, .navbar, footer, .no-print, .d-print-none, .modal, .modal-backdrop {
