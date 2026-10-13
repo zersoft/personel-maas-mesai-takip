@@ -113,7 +113,7 @@ if (!defined('APP_SHORT_NAME')) {
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo ($currentPage === 'avans_takip.php') ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>avans_takip.php">
+                        <a class="nav-link <?php echo in_array($currentPage, ['avans_takip.php', 'toplu_avans.php', 'avans_duzenle.php']) ? 'active' : ''; ?>" href="<?php echo $menuPagesPath; ?>avans_takip.php">
                             <i class="bi bi-wallet2"></i> Avans Takip
                         </a>
                     </li>

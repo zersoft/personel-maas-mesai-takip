@@ -5,6 +5,18 @@
  */
 return [
     [
+        'version' => '2.0.5',
+        'date'    => '2025-02-16',
+        'title'   => 'Dönemsel Toplu Avans Girişi ve Düzenleme',
+        'notes'   => [
+            'Dönem bazlı toplu avans girişi ve düzenleme modülü eklendi (toplu_avans.php).',
+            'Seçilen döneme ait tüm aktif personeller listelenir; mevcut avans kayıtları otomatik yüklenip doğrudan düzenlenebilir.',
+            'Tümünü seç, seçilenlere toplu tarih, banka avansı, nakit avansı ve açıklama uygulama araçları eklendi.',
+            'Canlı toplam (Banka, Nakit, Genel Toplam) hesaplama ve dinamik personel arama filtresi eklendi.',
+            'Avans Takibi sayfasına Toplu Avans butonu ve bildirim mesajları eklendi.',
+        ],
+    ],
+    [
         'version' => '2.0.4',
         'date'    => '2025-02-15',
         'title'   => 'OYS markası, Kantar Raporları, Viewer rolü',

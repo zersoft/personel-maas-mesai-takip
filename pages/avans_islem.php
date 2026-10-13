@@ -37,7 +37,19 @@ try {
         $del = $pdo->prepare('DELETE FROM avans_takip WHERE id = ?');
         $del->execute([$id]);
         logUserAction('avans_takip', 'DELETE', $id, "Avans silindi");
-        safeRedirect('avans_takip.php?success=' . urlencode('Avans silindi.'));
+        $redirectUrl = 'avans_takip.php?success=' . urlencode('Avans silindi.');
+        if (isset($_SERVER['HTTP_REFERER'])) {
+            $refererPath = parse_url($_SERVER['HTTP_REFERER'], PHP_URL_PATH);
+            if (basename($refererPath) === 'toplu_avans.php') {
+                $query = parse_url($_SERVER['HTTP_REFERER'], PHP_URL_QUERY);
+                parse_str($query ?: '', $qParams);
+                $qParams['success'] = 1;
+                $qParams['silinen'] = 1;
+                unset($qParams['error'], $qParams['eklenen'], $qParams['guncellenen']);
+                $redirectUrl = 'toplu_avans.php?' . http_build_query($qParams);
+            }
+        }
+        safeRedirect($redirectUrl);
     }
 
     // Ortak girişler (INSERT/UPDATE)

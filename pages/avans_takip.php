@@ -33,6 +33,14 @@ try {
 }
 
 include '../includes/header.php';
+
+if (isset($_GET['success'])) {
+    $msg = $_GET['success'] === '1' ? 'İşlem başarıyla tamamlandı.' : $_GET['success'];
+    echo showMessage($msg, 'success');
+}
+if (isset($_GET['error'])) {
+    echo showMessage($_GET['error'], 'danger');
+}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -61,6 +69,9 @@ include '../includes/header.php';
             </a>
         <?php endif; ?>
         <?php if (canEdit()): ?>
+        <a href="toplu_avans.php?ay=<?php echo $ay; ?>&yil=<?php echo $yil; ?>" class="btn btn-sm btn-warning">
+            <i class="bi bi-wallet2"></i> Toplu Avans
+        </a>
         <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#avansEkleModal">
             <i class="bi bi-plus-circle"></i> Avans Ekle
         </button>
